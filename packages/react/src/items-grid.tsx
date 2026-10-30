@@ -5,12 +5,12 @@ import {
   getProbeStyle,
   getViewportStyle,
   getVisuallyHiddenStyle,
-  isEditableTarget,
   ITEMS_GRID_CLASSES as CLASSES,
   type ItemsGridHandle,
   type ItemsGridOptions,
   type ItemsGridState,
   type PagerLabels,
+  shouldPageGrid,
 } from '@quietfoundry/items-grid-core';
 import {
   type CSSProperties,
@@ -83,7 +83,7 @@ function ItemsGridInner<T>(
   useImperativeHandle(ref, () => controller, [controller]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (!isEditableTarget(event.target) && controller.handleKeydown(event.key)) {
+    if (shouldPageGrid(event.nativeEvent) && controller.handleKeydown(event.key)) {
       event.preventDefault();
     }
   };

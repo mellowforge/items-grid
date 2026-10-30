@@ -1,6 +1,6 @@
 import type { ItemsGridHandle, PageRequest } from '@quietfoundry/items-grid-core';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { createRef, type Ref, StrictMode } from 'react';
+import { Component, createRef, type ReactNode, type Ref, StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ItemsGrid, type ItemsGridProps } from './items-grid';
@@ -47,6 +47,16 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+
+class Boundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  override state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  override render() {
+    return this.state.error ? <p role="alert">{this.state.error.message}</p> : this.props.children;
+  }
+}
 
 describe('ItemsGrid', () => {
   it('renders exactly one page of cards once the viewport is measured', () => {
@@ -137,7 +147,7 @@ describe('ItemsGrid', () => {
     const probe = container.querySelector<HTMLElement>('.qf-items-grid__probe')!;
     expect(probe.getAttribute('aria-hidden')).toBe('true');
     act(() => {
-      ResizeObserverStub.for(probe).fire(280, 118, { inlineSize: 280, blockSize: 118 });
+      ResizeObserverStub.for(probe).fire(280, 100, { inlineSize: 280, blockSize: 118 });
       flushFrames();
     });
     expect(viewport().style.gridAutoRows).toBe('118px');
@@ -273,10 +283,17 @@ describe('ItemsGrid', () => {
 
   it('renders a custom pager and none when pager is false', () => {
     const { rerender } = render(
-      <Grid pager={({ state }) => <p>custom {state.pageIndex + 1}</p>} />
+      <Grid
+        pager={({ state, controller }) => (
+          <button type="button" onClick={controller.next}>
+            custom {state.pageIndex + 1}
+          </button>
+        )}
+      />
     );
     layout();
-    expect(screen.getByText('custom 1')).toBeTruthy();
+    fireEvent.click(screen.getByText('custom 1'));
+    expect(screen.getByText('custom 2')).toBeTruthy();
     rerender(<Grid pager={false} />);
     expect(screen.queryByRole('navigation')).toBeNull();
   });
@@ -318,6 +335,84 @@ describe('ItemsGrid', () => {
     expect(live()).toHaveLength(1);
     unmount();
     expect(live()).toHaveLength(0);
+  });
+
+  it('surfaces invalid options as an error', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { rerender } = render(
+      <Boundary>
+        <Grid />
+      </Boundary>
+    );
+    layout();
+    rerender(
+      <Boundary>
+        <Grid preset="huge" />
+      </Boundary>
+    );
+    expect(screen.getByRole('alert').textContent).toContain('items-grid: unknown preset "huge"');
+    error.mockRestore();
+  });
+
+  it('sends no page request after unmount', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const requests: PageRequest[] = [];
+    const { unmount } = render(
+      <Grid mode="server" items={[]} onPageRequest={request => requests.push(request)} />
+    );
+    layout();
+    layout(976, 552);
+    unmount();
+    vi.advanceTimersByTime(500);
+    vi.useRealTimers();
+    expect(requests).toHaveLength(1);
+  });
+
+  it('pages on while the server total is unknown and pages come back full', () => {
+    const requests: PageRequest[] = [];
+    render(
+      <Grid mode="server" items={entities(12)} onPageRequest={request => requests.push(request)} />
+    );
+    layout();
+    expect(screen.getByText('Items 1–12')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Page 2' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    expect(requests.at(-1)).toEqual({ pageIndex: 1, pageSize: 12 });
+  });
+
+  it('passes pager labels through, ignoring undefined ones', () => {
+    render(<Grid pagerLabels={{ next: 'Weiter', page: undefined }} />);
+    layout();
+    expect(screen.getByRole('button', { name: 'Weiter' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Page 1' })).toBeTruthy();
+  });
+
+  it('reports reanchoring when a hidden grid is shown again', () => {
+    const onPageChange = vi.fn();
+    render(<Grid items={entities(120)} onPageChange={onPageChange} />);
+    layout();
+    fireEvent.click(screen.getByRole('button', { name: 'Page 5' })); // index 4, item 48
+    layout(0, 0);
+    layout(976, 552); // 9 per page → item 48 is on index 5
+    expect(onPageChange).toHaveBeenLastCalledWith(5);
+  });
+
+  it('does not page when a card already handled the key', () => {
+    render(
+      <Grid
+        renderItem={item => (
+          <article onKeyDown={event => event.preventDefault()}>{item.name}</article>
+        )}
+      />
+    );
+    layout();
+    fireEvent.keyDown(screen.getByText('Entity 0'), { key: 'PageDown' });
+    expect(cards()[0]).toBe('Entity 0');
+  });
+
+  it('keeps the pager status blank until the grid is measured', () => {
+    const { container } = render(<Grid />);
+    expect(container.querySelector('.qf-items-grid-pager__status')!.textContent).toBe('');
   });
 
   it('works in StrictMode after the remount (state still updates)', () => {

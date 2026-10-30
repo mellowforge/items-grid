@@ -36,7 +36,9 @@ export function ItemsGridPager({
       aria-label={text.navigation}
     >
       <span className={CLASSES.pagerStatus}>
-        {state.loading ? '' : text.status(state.range, state.total, state.totalKnown)}
+        {state.loading || !state.geometry
+          ? ''
+          : text.status(state.range, state.total, state.totalKnown)}
       </span>
       <div className={CLASSES.pagerList}>
         <button
