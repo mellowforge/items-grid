@@ -58,6 +58,14 @@ const NO_PAGE: ServerPage = { ids: [], total: undefined, loading: true };
             </button>
           </span>
         }
+        @if (loadError()) {
+          <span class="banner banner--error" role="alert">
+            <span>Could not load this page</span>
+            <button type="button" class="banner__show" (click)="grid().controller.refresh()">
+              Retry
+            </button>
+          </span>
+        }
         <span class="toolbar__spacer"></span>
         <app-segmented
           label="Density"
@@ -106,7 +114,7 @@ const NO_PAGE: ServerPage = { ids: [], total: undefined, loading: true };
         (pageRequest)="onPageRequest($event)"
         (stateChange)="onStateChange($event)"
       >
-        <ng-template qfItemsGridItem let-entity>
+        <ng-template qfItemsGridItem [qfItemsGridItemOf]="items()" let-entity>
           <article
             appCard
             [entity]="entity"
@@ -150,6 +158,7 @@ export class App {
   protected readonly realtime = signal(false);
   protected readonly server = signal<ServerPage>(NO_PAGE);
   protected readonly pendingCount = signal(0);
+  protected readonly loadError = signal(false);
   protected readonly grid = viewChild.required(QfItemsGrid<Entity>);
 
   protected readonly getKey = (entity: Entity): string => entity.id;
@@ -178,6 +187,8 @@ export class App {
               if (this.reflow() === 'live') {
                 this._quietRefresh = true;
                 this.grid().controller.refresh();
+                // No request goes out while the grid is hidden; don't let the flag leak.
+                this._quietRefresh = false;
               }
             }
           },
@@ -190,14 +201,23 @@ export class App {
     const seq = ++this._requestSeq;
     if (!this._quietRefresh) this.server.update((page) => ({ ...page, loading: true }));
     this._quietRefresh = false;
-    void fetchPage(this.database(), request).then((response) => {
-      if (seq !== this._requestSeq) return;
-      this.server.set({
-        ids: response.items.map((entity) => entity.id),
-        total: response.total,
-        loading: false,
-      });
-    });
+    this.loadError.set(false);
+    fetchPage(this.database(), request).then(
+      (response) => {
+        if (seq !== this._requestSeq || this.mode() !== 'server') return;
+        this.server.set({
+          ids: response.items.map((entity) => entity.id),
+          total: response.total,
+          loading: false,
+        });
+      },
+      () => {
+        // A failed page keeps its slot; refresh() asks for it again.
+        if (seq !== this._requestSeq) return;
+        this.server.update((page) => ({ ...page, loading: false }));
+        this.loadError.set(true);
+      },
+    );
   }
 
   protected onStateChange(state: ItemsGridState<Entity>): void {

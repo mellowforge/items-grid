@@ -213,6 +213,12 @@ header.append(element('span', 'app__flavor', 'items-grid · vanilla'));
 const main = element('main', 'app__main');
 const toolbar = element('div', 'toolbar');
 const count = element('span', 'toolbar__count');
+const errorBanner = element('span', 'banner banner--error');
+errorBanner.setAttribute('role', 'alert');
+errorBanner.hidden = true;
+const retryButton = element('button', 'banner__show', 'Retry');
+retryButton.type = 'button';
+errorBanner.append(element('span', undefined, 'Could not load this page'), retryButton);
 const banner = element('span', 'banner');
 banner.hidden = true;
 const bannerText = element('span');
@@ -229,6 +235,7 @@ toolbar.append(
   element('h1', 'toolbar__title', 'Entities'),
   count,
   banner,
+  errorBanner,
   element('span', 'toolbar__spacer'),
   segmented('Density', DENSITY_OPTIONS, () => density, setDensity),
   segmented('Data', MODE_OPTIONS, () => mode, setMode),
@@ -286,7 +293,18 @@ async function loadPage(request: PageRequest): Promise<void> {
     syncData();
   }
   quietRefresh = false;
-  const response = await fetchPage(database, request);
+  errorBanner.hidden = true;
+  let response;
+  try {
+    response = await fetchPage(database, request);
+  } catch {
+    // A failed page keeps its slot; refresh() asks for it again.
+    if (seq !== requestSeq) return;
+    loading = false;
+    errorBanner.hidden = false;
+    syncData();
+    return;
+  }
   if (seq !== requestSeq || mode !== 'server') return;
   serverIds = response.items.map(entity => entity.id);
   serverTotal = response.total;
@@ -300,6 +318,7 @@ function renderChrome(state: ItemsGridState<Entity>): void {
 }
 
 showButton.addEventListener('click', () => grid.controller.refresh());
+retryButton.addEventListener('click', () => grid.controller.refresh());
 
 // The switches are app state: flip `enabled` on the entity, the grid patches the card.
 gridHost.addEventListener('change', event => {
@@ -348,6 +367,8 @@ realtimeInput.addEventListener('change', () => {
             if (reflow === 'live') {
               quietRefresh = true;
               grid.controller.refresh();
+              // No request goes out while the grid is hidden; don't let the flag leak.
+              quietRefresh = false;
             }
           }
           syncData();

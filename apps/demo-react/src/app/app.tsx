@@ -1,6 +1,6 @@
 import type {
   GridAlign,
-  ItemsGridController,
+  ItemsGridHandle,
   PageRequest,
   PagingMode,
   ReflowMode,
@@ -40,7 +40,8 @@ export function App(): ReactElement {
   const [realtime, setRealtime] = useState(false);
   const [server, setServer] = useState<ServerPage>(NO_PAGE);
   const [pendingCount, setPendingCount] = useState(0);
-  const grid = useRef<ItemsGridController<Entity>>(null);
+  const [loadError, setLoadError] = useState(false);
+  const grid = useRef<ItemsGridHandle<Entity>>(null);
 
   // Latest values for the simulation and the fake API, which run outside React.
   const latest = useRef({ database, mode, reflow });
@@ -54,14 +55,23 @@ export function App(): ReactElement {
     const seq = ++requestSeq.current;
     if (!quietRefresh.current) setServer(page => ({ ...page, loading: true }));
     quietRefresh.current = false;
-    void fetchPage(latest.current.database, request).then(response => {
-      if (seq !== requestSeq.current) return;
-      setServer({
-        ids: response.items.map(entity => entity.id),
-        total: response.total,
-        loading: false,
-      });
-    });
+    setLoadError(false);
+    fetchPage(latest.current.database, request).then(
+      response => {
+        if (seq !== requestSeq.current || latest.current.mode !== 'server') return;
+        setServer({
+          ids: response.items.map(entity => entity.id),
+          total: response.total,
+          loading: false,
+        });
+      },
+      () => {
+        // A failed page keeps its slot; refresh() asks for it again.
+        if (seq !== requestSeq.current) return;
+        setServer(page => ({ ...page, loading: false }));
+        setLoadError(true);
+      }
+    );
   };
 
   useEffect(() => {
@@ -77,6 +87,8 @@ export function App(): ReactElement {
           if (latest.current.reflow === 'live') {
             quietRefresh.current = true;
             grid.current?.refresh();
+            // No request goes out while the grid is hidden; don't let the flag leak.
+            quietRefresh.current = false;
           }
         }
       },
@@ -120,6 +132,18 @@ export function App(): ReactElement {
                 onClick={() => grid.current?.refresh()}
               >
                 Show
+              </button>
+            </span>
+          ) : null}
+          {loadError ? (
+            <span className="banner banner--error" role="alert">
+              <span>Could not load this page</span>
+              <button
+                type="button"
+                className="banner__show"
+                onClick={() => grid.current?.refresh()}
+              >
+                Retry
               </button>
             </span>
           ) : null}
