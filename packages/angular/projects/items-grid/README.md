@@ -31,15 +31,21 @@ import {
       preset="compact"
       [(pageIndex)]="page"
     >
-      <ng-template qfItemsGridItem let-device>
+      <ng-template qfItemsGridItem [qfItemsGridItemOf]="devices()" let-device>
         <app-device-card [device]="device" />
       </ng-template>
       <ng-template qfItemsGridSkeleton><app-skeleton-card /></ng-template>
       <ng-template qfItemsGridEmpty><app-empty-state /></ng-template>
     </qf-items-grid>
   `,
-  // The grid needs a definite height from your layout.
+  // The grid needs a definite height from your layout: here the host is a full-height
+  // flex column and the grid takes the space left by any toolbar.
   styles: `
+    :host {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
     .devices-grid {
       flex: 1;
       min-height: 0;
@@ -53,26 +59,32 @@ export class Devices {
 }
 ```
 
-Optional pager theme — add to `angular.json` styles:
-`node_modules/@quietfoundry/items-grid-core/dist/styles.css`.
+Optional pager theme — import it once from a global stylesheet:
+`@import '@quietfoundry/items-grid-core/styles.css';`
+
+`[qfItemsGridItemOf]` is only for typing: with `strictTemplates`, `let-device` is then a
+`Device`. Forgetting to import `QfItemsGridItem` renders empty cards and logs a warning.
 
 ## API
 
 **Inputs** mirror the core options (see the core README): `items`, `getKey` (required),
 `mode`, `total`, `preset`, `presets`, `measureRowHeight`, `sampleItem`, `maxColumns`,
 `maxPageSize`, `reflow`, `align`, `loading`, `pageIndex`, `requestDebounceMs`, `messages`,
-plus `pager` (default `true`), `pagerLabels` and `ariaLabel`.
+plus `pager` (default `true`), `pagerLabels` and `ariaLabel`. Invalid values throw an
+`items-grid:` error and keep the previous options.
 
-**Outputs:** `pageRequest` (server mode: `{ pageIndex, pageSize }`), `pageIndexChange`
-(so `[(pageIndex)]` binds two-way) and `stateChange` (every new state — e.g. for a
-"5 new items" banner from `pendingCount`).
+**Outputs:** `pageRequest` (server mode: `{ pageIndex, pageSize }` — set `loading` in the
+handler, and retry a failed page with `grid.controller.refresh()`), `pageIndexChange` (every
+page change the grid makes, so `[(pageIndex)]` binds two-way) and `stateChange` (every new
+state — e.g. for a "5 new items" banner from `pendingCount`).
 
-**Templates:** `ng-template[qfItemsGridItem]` (context: `$implicit` / `item`, `index`),
+**Templates:** `ng-template[qfItemsGridItem]` (context: `$implicit` / `item`, `index` =
+`range.start` + the offset on the page),
 `ng-template[qfItemsGridSkeleton]` (context: `$implicit` / `slot`) and
 `ng-template[qfItemsGridEmpty]`.
 
 **Template reference:** `#grid="qfItemsGrid"` exposes `grid.state()` (a signal of the render
-state) and `grid.controller` (`next()`, `goTo()`, `refresh()`, …). To place a custom pager,
+state) and `grid.controller`, an `ItemsGridHandle` (`next()`, `goTo()`, `refresh()`, …). To place a custom pager,
 set `[pager]="false"` and render
 `<qf-items-grid-pager [controller]="grid.controller" [state]="grid.state()" />` anywhere.
 

@@ -44,7 +44,6 @@ export function useItemsGrid<T>(options: ItemsGridOptions<T>): UseItemsGridResul
   });
 
   const [controller] = useState(() => new ItemsGridController<T>(options));
-  // Stable wrappers over the latest callbacks: a new identity never re-syncs the grid.
   useLayoutEffect(() => {
     controller.setOptions({
       getKey: item => latest.current.getKey(item),

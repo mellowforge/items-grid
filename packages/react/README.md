@@ -36,29 +36,31 @@ Every option of the core (`mode`, `total`, `preset`, `presets`, `measureRowHeigh
 `requestDebounceMs`, `onPageRequest`, `onPageChange`, `onStateChange`, `messages`) is a prop —
 see the [core README](../core/README.md#options-itemsgridoptionst). Callbacks may be inline
 arrows: they are read from a latest-value ref, so a new identity never re-syncs the grid.
+Object props (`items`, `presets`, `sampleItem`) are compared by identity, so memoize them.
 
 Additional props:
 
-| Prop                 | Description                                                                                  |
-| -------------------- | -------------------------------------------------------------------------------------------- |
-| `renderItem`         | **Required.** `(item, index) => ReactNode`. Cards keep their DOM across updates by `getKey`. |
-| `renderSkeleton`     | `(slot) => ReactNode`, rendered once per slot while `loading`.                               |
-| `renderEmpty`        | `() => ReactNode`, rendered over the viewport when there are no items.                       |
-| `pager`              | `true` (default), `false`, or `({ state, controller }) => ReactNode` for your own.           |
-| `pagerLabels`        | Localized pager texts.                                                                       |
-| `aria-label`         | Accessible name of the card list.                                                            |
-| `className`, `style` | Applied to the host element.                                                                 |
+| Prop                 | Description                                                                                                                                     |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `renderItem`         | **Required.** `(item, index) => ReactNode`; `index` is `range.start` + the offset on the page. Cards keep their DOM across updates by `getKey`. |
+| `renderSkeleton`     | `(slot) => ReactNode`, rendered once per slot while `loading`.                                                                                  |
+| `renderEmpty`        | `() => ReactNode`, rendered over the viewport when there are no items.                                                                          |
+| `pager`              | `true` (default), `false`, or `({ state, controller }) => ReactNode` for your own.                                                              |
+| `pagerLabels`        | Localized pager texts.                                                                                                                          |
+| `aria-label`         | Accessible name of the card list.                                                                                                               |
+| `className`, `style` | Applied to the host element.                                                                                                                    |
 
-`pageIndex` sets the first page and is followed when it changes; `onPageChange` reports the
-grid's own changes.
+`pageIndex` sets the first page and navigates when it changes; `onPageChange` reports every
+page change the grid makes (navigation, reanchoring, clamping).
 
 ### Server mode
 
 ```tsx
 <ItemsGrid
+  ref={grid}
   mode="server"
   items={page.items}
-  total={page.total}
+  total={page.total} // undefined while unknown: next stays enabled while pages come back full
   loading={loading}
   onPageRequest={({ pageIndex, pageSize }) => load(pageIndex, pageSize)}
   getKey={device => device.id}
@@ -67,13 +69,17 @@ grid's own changes.
 />
 ```
 
+In `load`, set `loading` synchronously, drop responses that arrive after a newer request,
+and on failure clear `loading` and offer a retry with `grid.current?.refresh()`.
+
 ### Imperative API and app chrome
 
-The `ref` receives the core `ItemsGridController` (`next()`, `goTo()`, `refresh()`, …).
+The `ref` receives an `ItemsGridHandle` (`next()`, `goTo()`, `refresh()`, `getState()`, …).
 `onStateChange` lets chrome outside the grid react — e.g. a "5 new items" banner in stable
 mode whose button calls `ref.current.refresh()`. For fully custom markup, `useItemsGrid`
-returns `{ controller, state, viewportRef, probeRef }`, and `ItemsGridPager` renders the
-pager from any state and controller.
+returns `{ controller, state, viewportRef, probeRef }`: attach `viewportRef` on the first
+render and apply `getViewportStyle(state)` to it inline (its height must come from the
+host). `ItemsGridPager` renders the pager from any state and handle, anywhere.
 
 ## License
 

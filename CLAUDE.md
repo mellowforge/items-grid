@@ -9,7 +9,7 @@ Design history: Figma prototypes (presets × viewports, states, slack alignment)
 ## Layout
 
 ```text
-packages/core                     engine/ (pure: layout, paging, presets, freeze) · controller.ts · dom/ (observe, styles, vanilla) · styles/
+packages/core                     engine/ (pure: layout, paging, presets, freeze) · controller.ts · pager.ts · dom/ (observe, keyboard, styles, vanilla) · styles/
 packages/react                    useItemsGrid · <ItemsGrid> · <ItemsGridPager>
 packages/angular                  Angular CLI workspace; library at projects/items-grid
 apps/demo-shared                  fixtures, simulation, fake API, shared demo.css (source-only)
@@ -30,7 +30,9 @@ apps/demo-react, apps/demo-angular  source-linked mirrors of each other
 - **Grid only**: no card markup or card styles ship from `packages/`. Sample cards live in `apps/`.
 - **Identity**: `getKey(item)` takes no index; card DOM is keyed by it in every renderer.
 - **Anchor**: resizes and preset changes reanchor on the index of the first card at the last navigation; the anchor survives the viewport being hidden.
-- **Server mode**: an unknown `total` never clamps the page; resize-driven requests are debounced, navigation and `refresh()` are immediate, identical requests are deduplicated.
+- **Server mode**: an unknown `total` (`undefined`/`null`) never clamps the page and `canNext` follows full pages; page-size-driven requests are debounced, navigation, `refresh()` and entering server mode are immediate, identical requests are deduplicated, and a mode switch forgets the last request.
+- **Inputs fail loudly**: invalid options throw an `items-grid:` error before being stored; misuse that cannot throw (duplicate keys, a missing Angular item template, no ResizeObserver) warns once.
+- **Apps get `ItemsGridHandle`**, never the full controller with its setters.
 - **Controller lifecycle**: `destroy()` must stay reversible (React StrictMode re-subscribes). The constructor never reports state through `onStateChange`.
 - **React**: callbacks via a latest-value ref (inline arrows are free — don't add `useCallback`); options are pushed in layout effects, never during render; React 18 and 19 peers, so no React-19-only APIs in the library.
 - **Angular**: signal inputs/outputs, zoneless; a `_version` signal bridges the controller; observers attach in effects with `onCleanup`.

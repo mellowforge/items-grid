@@ -5,7 +5,7 @@ entity cards — devices, jobs, services, accounts — with a React and an Angul
 
 It moves the code every dashboard keeps re-implementing into one place:
 
-- **Consistent row height** — fixed per size preset, or measured once from a sample card.
+- **Consistent row height** — fixed per size preset, or measured from a sample card.
 - **Exact fit and pagination** — as many full rows and columns as fit the container
   (`cols × rows`), the rest on other pages, recomputed on resize while keeping the first card
   of the page on screen.
@@ -26,7 +26,7 @@ It moves the code every dashboard keeps re-implementing into one place:
 ```text
 cols     = max(1, floor((width  + gap) / (minCardWidth + gap)))
 rows     = max(1, floor((height + gap) / (rowHeight    + gap)))
-pageSize = cols × rows            (capped by maxPageSize: rows first, then columns)
+pageSize = cols × rows            (capped by maxColumns / maxPageSize: rows first, then columns)
 ```
 
 The grid measures only its own viewport, so the host needs a **definite height** from your
