@@ -333,14 +333,10 @@ interface Caught {
   readonly error: unknown;
 }
 
-/** Errors collected during a sync; the first is rethrown, the rest are logged. */
-interface Failure {
-  readonly errors: readonly Caught[];
-}
-
-function rethrow(failure: Failure | null): void {
-  if (!failure) return;
-  const [first, ...rest] = failure.errors;
+/** Rethrows the first error collected during a sync and logs the rest; no-op when empty. */
+function rethrow(errors: readonly Caught[]): void {
+  if (errors.length === 0) return;
+  const [first, ...rest] = errors;
   for (const { source, error } of rest) {
     console.error(
       `items-grid: ${source} threw during an update; the first error was rethrown.`,
@@ -349,6 +345,9 @@ function rethrow(failure: Failure | null): void {
   }
   throw first!.error;
 }
+
+const sameRequest = (a: PageRequest | null, b: PageRequest): boolean =>
+  !!a && a.pageIndex === b.pageIndex && a.pageSize === b.pageSize;
 
 /** How soon the page request a sync asks for must go out. */
 interface OwedRequest {
@@ -426,13 +425,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     validate(next);
 
     // Everything below is undone if deriving the new state throws (e.g. a throwing getKey).
-    const saved = {
-      snapshot: this._snapshot,
-      baselineTotal: this._baselineTotal,
-      lastRequest: this._lastRequest,
-      pageIndex: this._pageIndex,
-      anchorIndex: this._anchorIndex,
-    };
+    const restore = this._checkpoint();
     this._options = next;
     const modeChanged = (previous.mode ?? 'client') !== (next.mode ?? 'client');
     if (modeChanged) {
@@ -449,24 +442,53 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
       next.pageIndex !== previous.pageIndex &&
       Math.floor(next.pageIndex) !== this._state.pageIndex;
     if (navigated) {
-      this._pageIndex = Math.floor(next.pageIndex!);
-      if (!this._state.geometry) this._anchorIndex = null;
+      this._moveTo(next.pageIndex!);
     }
 
-    let failure: Failure | null;
+    let cause: SyncCause = 'options';
+    if (modeChanged) {
+      cause = 'mode';
+    } else if (navigated) {
+      cause = 'navigate';
+    }
+    let errors: readonly Caught[];
     try {
-      failure = this._sync(modeChanged ? 'mode' : navigated ? 'navigate' : 'options', navigated);
+      errors = this._sync(cause, navigated);
     } catch (error) {
-      this._options = previous;
-      this._snapshot = saved.snapshot;
-      this._baselineTotal = saved.baselineTotal;
-      this._lastRequest = saved.lastRequest;
-      this._pageIndex = saved.pageIndex;
-      this._anchorIndex = saved.anchorIndex;
+      restore();
       throw error;
     }
     optionsRevisions.set(this, getOptionsRevision(this) + 1);
-    rethrow(failure);
+    rethrow(errors);
+  }
+
+  /** Captures the options and paging bookkeeping; the returned function puts them back. */
+  private _checkpoint(): () => void {
+    const options = this._options;
+    const snapshot = this._snapshot;
+    const baselineTotal = this._baselineTotal;
+    const lastRequest = this._lastRequest;
+    const pageIndex = this._pageIndex;
+    const anchorIndex = this._anchorIndex;
+    return () => {
+      this._options = options;
+      this._snapshot = snapshot;
+      this._baselineTotal = baselineTotal;
+      this._lastRequest = lastRequest;
+      this._pageIndex = pageIndex;
+      this._anchorIndex = anchorIndex;
+    };
+  }
+
+  /**
+   * Sets the requested page (floored, at least 0). Before the grid is measured the explicit
+   * page wins over the anchor of an earlier layout.
+   */
+  private _moveTo(pageIndex: number): void {
+    this._pageIndex = Math.max(0, Math.floor(pageIndex));
+    if (!this._state.geometry) {
+      this._anchorIndex = null;
+    }
   }
 
   /** Reports the viewport's content-box size. Adapters wire this to a ResizeObserver. */
@@ -496,11 +518,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
    */
   readonly goTo = (pageIndex: number): void => {
     if (!Number.isFinite(pageIndex)) throw invalid('pageIndex', pageIndex);
-    this._pageIndex = Math.max(0, Math.floor(pageIndex));
-    if (!this._state.geometry) {
-      // The explicit page wins over the anchor of an earlier layout.
-      this._anchorIndex = null;
-    }
+    this._moveTo(pageIndex);
     rethrow(this._sync('navigate'));
   };
 
@@ -611,7 +629,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
    * Derives and commits the state for `cause`. Throws only before committing; errors from
    * subscribers and callbacks are collected and returned for the caller to rethrow.
    */
-  private _sync(cause: SyncCause, navigated = false): Failure | null {
+  private _sync(cause: SyncCause, navigated = false): readonly Caught[] {
     const options = this._options;
     const items = options.items ?? EMPTY;
     const isServer = options.mode === 'server';
@@ -650,13 +668,10 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     const boundTotal = totalKnown ? knownTotal : Number.MAX_SAFE_INTEGER;
     const boundPageCount = getPageCount(boundTotal, pageSize);
     let pageIndex = this._pageIndex;
-    let freeze =
-      cause === 'navigate' ||
-      cause === 'refresh' ||
-      cause === 'mode' ||
-      firstLayout ||
-      pageSizeChanged;
-    let requestNow = cause === 'navigate' || cause === 'refresh' || cause === 'mode' || firstLayout;
+    // The app asked for this page (or a new data source): freeze it and request it now.
+    const explicit = cause === 'navigate' || cause === 'refresh' || cause === 'mode';
+    let freeze = explicit || firstLayout || pageSizeChanged;
+    let requestNow = explicit || firstLayout;
 
     if (firstLayout) {
       // A grid shown again after being hidden keeps its anchor, like a resize.
@@ -678,9 +693,11 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
         freeze = true;
       }
     }
-    if (firstLayout || cause === 'navigate' || navigated) {
-      this._anchorIndex =
-        firstLayout && this._anchorIndex !== null ? this._anchorIndex : pageIndex * pageSize;
+    // Navigation anchors on the shown page, and so does a first layout, unless the grid is
+    // shown again and keeps its earlier anchor.
+    const keepsAnchor = firstLayout && this._anchorIndex !== null;
+    if (!keepsAnchor && (firstLayout || cause === 'navigate' || navigated)) {
+      this._anchorIndex = pageIndex * pageSize;
     }
 
     // Page contents.
@@ -702,31 +719,33 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
         } else if (totalKnown && (freeze || this._baselineTotal === null)) {
           this._baselineTotal = knownTotal;
         }
-        frozen = totalKnown && this._baselineTotal !== null;
-        pendingCount = frozen ? Math.max(0, knownTotal - this._baselineTotal!) : 0;
+        const baselineTotal = this._baselineTotal;
+        if (totalKnown && baselineTotal !== null) {
+          frozen = true;
+          pendingCount = Math.max(0, knownTotal - baselineTotal);
+        }
       }
     } else if (stable) {
-      const freezeAt = (index: number): void => {
+      const freezeAt = (index: number): FreezeSnapshot => {
         this._snapshot = createSnapshot(
           items,
           options.getKey,
           getPageRange(index, pageSize, knownTotal)
         );
+        return this._snapshot;
       };
-      if (freeze || !this._snapshot) {
-        freezeAt(pageIndex);
-      }
-      pageItems = resolveFrozenPage(this._snapshot!, items, options.getKey);
+      let snapshot = freeze || !this._snapshot ? freezeAt(pageIndex) : this._snapshot;
+      pageItems = resolveFrozenPage(snapshot, items, options.getKey);
       if (pageItems.length === 0 && knownTotal > 0) {
         // Every frozen card is gone: show what is there now instead of an empty page.
         pageIndex = clampPageIndex(pageIndex, boundPageCount);
-        freezeAt(pageIndex);
-        pageItems = resolveFrozenPage(this._snapshot!, items, options.getKey);
+        snapshot = freezeAt(pageIndex);
+        pageItems = resolveFrozenPage(snapshot, items, options.getKey);
       }
       const start = pageIndex * pageSize;
       range = { start, end: start + pageItems.length };
       frozen = true;
-      pendingCount = countPending(this._snapshot!, items, options.getKey);
+      pendingCount = countPending(snapshot, items, options.getKey);
     } else {
       range = getPageRange(pageIndex, pageSize, knownTotal);
       pageItems = items.slice(range.start, range.end);
@@ -806,7 +825,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
    * syncs again (navigates, starts loading, destroys the grid) can neither drop nor reorder
    * them. Effects run even when a subscriber throws; every error is collected and returned.
    */
-  private _finish(next: ItemsGridState<T>, request: OwedRequest): Failure | null {
+  private _finish(next: ItemsGridState<T>, request: OwedRequest): readonly Caught[] {
     const errors: Caught[] = [];
     const attempt = (source: string, run: () => void): void => {
       try {
@@ -839,7 +858,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     } finally {
       this._depth--;
     }
-    return errors.length ? { errors } : null;
+    return errors;
   }
 
   /**
@@ -909,10 +928,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   // MARK: - Server requests
 
   private _request(request: PageRequest, immediate: boolean, force: boolean): void {
-    const last = this._lastRequest;
-    const same =
-      !!last && last.pageIndex === request.pageIndex && last.pageSize === request.pageSize;
-    if (same && !force) {
+    if (sameRequest(this._lastRequest, request) && !force) {
       if (immediate) {
         this._cancelRequest();
       }
@@ -938,15 +954,15 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
 
   private _debouncedRequest(): void {
     const { pageIndex, pageSize } = this._state;
-    const latest = this._lastRequest;
+    const request = { pageIndex, pageSize };
     if (
       this._options.mode !== 'server' ||
       pageSize <= 0 ||
-      (latest && latest.pageIndex === pageIndex && latest.pageSize === pageSize)
+      sameRequest(this._lastRequest, request)
     ) {
       return;
     }
-    this._emitRequest({ pageIndex, pageSize });
+    this._emitRequest(request);
   }
 
   private _emitRequest(request: PageRequest): void {

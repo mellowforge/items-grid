@@ -109,6 +109,13 @@ function create(tag: string, className: string, style?: StyleDeclarations): HTML
   return element;
 }
 
+function createPagerButton(onClick: () => void): HTMLButtonElement {
+  const button = create('button', CLASSES.pagerButton) as HTMLButtonElement;
+  button.type = 'button';
+  button.addEventListener('click', onClick);
+  return button;
+}
+
 /**
  * Mounts a grid into `container` without a framework. The container must get a definite
  * height from its layout (e.g. `flex: 1` or `height: 100%`); the grid fills it exactly.
@@ -151,15 +158,35 @@ export function mountItemsGrid<T>(
     next: HTMLButtonElement;
     slots: { item: PagerItem; element: HTMLElement }[];
   } | null = null;
+  let destroyed = false;
+  let rebuildCards = false;
+  let rebuildSkeletons = false;
+  let warnedDestroyed = false;
 
   const stopViewport = observeSize(viewport, size => controller.setViewportSize(size));
 
   // MARK: - Rendering
 
+  function clearCards(): void {
+    for (const entry of cards.values()) entry.cell.remove();
+    cards.clear();
+  }
+
+  function clearSkeletons(): void {
+    skeletons.splice(0).forEach(cell => cell.remove());
+  }
+
+  function removeProbe(): void {
+    if (probe) {
+      probe.stop();
+      probe.element.remove();
+      probe = null;
+    }
+  }
+
   function renderCells(state: ItemsGridState<T>): HTMLElement[] {
     if (state.loading && options.renderSkeleton) {
-      for (const entry of cards.values()) entry.cell.remove();
-      cards.clear();
+      clearCards();
       while (skeletons.length < state.skeletonCount) {
         const cell = create('div', `${CLASSES.cell} ${CLASSES.skeleton}`, getCellStyle());
         cell.setAttribute('aria-hidden', 'true');
@@ -169,7 +196,7 @@ export function mountItemsGrid<T>(
       skeletons.splice(state.skeletonCount).forEach(cell => cell.remove());
       return skeletons;
     }
-    skeletons.splice(0).forEach(cell => cell.remove());
+    clearSkeletons();
 
     const desired: HTMLElement[] = [];
     const seen = new Set<ItemKey>();
@@ -211,11 +238,7 @@ export function mountItemsGrid<T>(
   function renderProbe(state: ItemsGridState<T>): void {
     const item = state.probeItem;
     if (item === undefined) {
-      if (probe) {
-        probe.stop();
-        probe.element.remove();
-        probe = null;
-      }
+      removeProbe();
       return;
     }
     if (!probe) {
@@ -245,15 +268,10 @@ export function mountItemsGrid<T>(
       const nav = create('nav', CLASSES.pager);
       const status = create('span', CLASSES.pagerStatus);
       const list = create('div', CLASSES.pagerList);
-      const button = (text: string, onClick: () => void): HTMLButtonElement => {
-        const element = create('button', CLASSES.pagerButton) as HTMLButtonElement;
-        element.type = 'button';
-        element.textContent = text;
-        element.addEventListener('click', onClick);
-        return element;
-      };
-      const prev = button('‹', () => controller.prev());
-      const next = button('›', () => controller.next());
+      const prev = createPagerButton(() => controller.prev());
+      prev.textContent = '‹';
+      const next = createPagerButton(() => controller.next());
+      next.textContent = '›';
       list.append(prev, next);
       nav.append(status, list);
       container.insertBefore(nav, live);
@@ -271,27 +289,15 @@ export function mountItemsGrid<T>(
 
     // Reuse slots by position, so a clicked page button keeps focus after re-render.
     const items = getPagerItems(state.pageIndex, state.pageCount);
-    items.forEach((item, slot) => {
-      let entry = pager!.slots[slot];
+    for (const [slot, item] of items.entries()) {
+      let entry = pager.slots[slot];
       const isGap = item === 'gap';
       if (!entry || (entry.item === 'gap') !== isGap) {
-        const element = isGap
-          ? create('span', CLASSES.pagerGap)
-          : (create('button', CLASSES.pagerButton) as HTMLButtonElement);
-        if (isGap) {
-          element.textContent = '…';
-          element.setAttribute('aria-hidden', 'true');
-        } else {
-          (element as HTMLButtonElement).type = 'button';
-          element.addEventListener('click', () => {
-            const target = pager?.slots.find(candidate => candidate.element === element)?.item;
-            if (typeof target === 'number') controller.goTo(target);
-          });
-        }
+        const element = createPagerSlot(isGap);
         if (entry) entry.element.replaceWith(element);
-        else pager!.list.insertBefore(element, pager!.next);
+        else pager.list.insertBefore(element, pager.next);
         entry = { item, element };
-        pager!.slots[slot] = entry;
+        pager.slots[slot] = entry;
       }
       entry.item = item;
       if (typeof item === 'number') {
@@ -300,25 +306,35 @@ export function mountItemsGrid<T>(
         if (item === state.pageIndex) entry.element.setAttribute('aria-current', 'page');
         else entry.element.removeAttribute('aria-current');
       }
-    });
+    }
     pager.slots.splice(items.length).forEach(entry => entry.element.remove());
+  }
+
+  /** A gap marker, or a page button that navigates to whatever page its slot shows. */
+  function createPagerSlot(isGap: boolean): HTMLElement {
+    if (isGap) {
+      const gap = create('span', CLASSES.pagerGap);
+      gap.textContent = '…';
+      gap.setAttribute('aria-hidden', 'true');
+      return gap;
+    }
+    const button = createPagerButton(() => {
+      const target = pager?.slots.find(candidate => candidate.element === button)?.item;
+      if (typeof target === 'number') controller.goTo(target);
+    });
+    return button;
   }
 
   function render(): void {
     if (rebuildCards) {
       // A new renderer means new markup: rebuild every card (and the probe).
       rebuildCards = false;
-      for (const entry of cards.values()) entry.cell.remove();
-      cards.clear();
-      if (probe) {
-        probe.stop();
-        probe.element.remove();
-        probe = null;
-      }
+      clearCards();
+      removeProbe();
     }
     if (rebuildSkeletons) {
       rebuildSkeletons = false;
-      skeletons.splice(0).forEach(cell => cell.remove());
+      clearSkeletons();
     }
     const state = controller.getState();
     viewportStyle = applyStyle(viewport, getViewportStyle(state), viewportStyle);
@@ -352,10 +368,6 @@ export function mountItemsGrid<T>(
     if (live.textContent !== state.announcement) live.textContent = state.announcement;
   }
 
-  let destroyed = false;
-  let rebuildCards = false;
-  let rebuildSkeletons = false;
-  let warnedDestroyed = false;
   /** Whether the grid was destroyed; warns once, since the app still holds a dead handle. */
   const isDestroyed = (): boolean => {
     if (destroyed && !warnedDestroyed) {
@@ -367,26 +379,21 @@ export function mountItemsGrid<T>(
   const unsubscribe = controller.subscribe(render);
   render();
 
+  /** Wraps a controller action so it does nothing (but warn) after destroy(). */
+  const whileMounted =
+    <A extends unknown[]>(action: (...args: A) => void) =>
+    (...args: A): void => {
+      if (!isDestroyed()) action(...args);
+    };
+
   // The handle goes inert after destroy(), so late calls can't reach app callbacks.
   const handle: ItemsGridHandle<T> = {
-    goTo: pageIndex => {
-      if (!isDestroyed()) controller.goTo(pageIndex);
-    },
-    next: () => {
-      if (!isDestroyed()) controller.next();
-    },
-    prev: () => {
-      if (!isDestroyed()) controller.prev();
-    },
-    first: () => {
-      if (!isDestroyed()) controller.first();
-    },
-    last: () => {
-      if (!isDestroyed()) controller.last();
-    },
-    refresh: () => {
-      if (!isDestroyed()) controller.refresh();
-    },
+    goTo: whileMounted(controller.goTo),
+    next: whileMounted(controller.next),
+    prev: whileMounted(controller.prev),
+    first: whileMounted(controller.first),
+    last: whileMounted(controller.last),
+    refresh: whileMounted(controller.refresh),
     handleKeydown: key => !isDestroyed() && controller.handleKeydown(key),
     getState: controller.getState,
     subscribe: listener => (isDestroyed() ? () => {} : controller.subscribe(listener)),

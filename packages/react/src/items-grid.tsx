@@ -88,6 +88,12 @@ function ItemsGridInner<T>(
     }
   };
 
+  const renderPager = (): ReactNode => {
+    if (typeof pager === 'function') return pager({ state, controller });
+    if (pager) return <ItemsGridPager controller={controller} state={state} labels={pagerLabels} />;
+    return null;
+  };
+
   const showSkeletons = state.loading && !!renderSkeleton;
   return (
     <div
@@ -141,11 +147,7 @@ function ItemsGridInner<T>(
           </div>
         ) : null}
       </div>
-      {typeof pager === 'function' ? (
-        pager({ state, controller })
-      ) : pager ? (
-        <ItemsGridPager controller={controller} state={state} labels={pagerLabels} />
-      ) : null}
+      {renderPager()}
       <div className={CLASSES.live} style={LIVE_STYLE} aria-live="polite">
         {state.announcement}
       </div>
