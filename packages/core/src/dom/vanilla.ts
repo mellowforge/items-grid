@@ -67,10 +67,6 @@ interface CardEntry<T> {
   item: T;
 }
 
-/** A patch with no controller options can't be rejected by the controller. */
-const isNoop = <T>(patch: Partial<MountItemsGridOptions<T>>): boolean =>
-  Object.keys(controllerOptions(patch)).length === 0;
-
 const MOUNT_ONLY_KEYS = [
   'renderItem',
   'updateItem',
@@ -416,20 +412,21 @@ export function mountItemsGrid<T>(
         controller.setOptions(controllerOptions(next));
       } catch (error) {
         // Rejected (the controller kept its options): undo the mount's side as well.
-        if (getOptionsRevision(controller) === revision && !isNoop(next)) {
+        if (getOptionsRevision(controller) === revision) {
           ({ options, rebuildCards, rebuildSkeletons } = previous);
           throw error;
         }
         // Applied, but app code threw afterwards: keep the update and show it, without
         // letting a failing re-render replace the error the controller chose to surface.
         try {
-          render();
+          if (!destroyed) render();
         } catch (renderError) {
           console.error('items-grid: re-rendering after a failed update threw too.', renderError);
         }
         throw error;
       }
-      render();
+      // A callback triggered by this update may have destroyed the grid.
+      if (!destroyed) render();
     },
     destroy() {
       if (destroyed) return;

@@ -224,6 +224,8 @@ export interface ItemsGridHandle<T> {
 type SyncCause = 'options' | 'mode' | 'viewport' | 'measure' | 'navigate' | 'refresh';
 
 const DEFAULT_DEBOUNCE_MS = 150;
+/** Effects rounds before the loop gives up on callbacks that keep re-triggering it. */
+const MAX_EFFECT_ROUNDS = 100;
 const EMPTY: readonly never[] = Object.freeze([]);
 const MODES: readonly PagingMode[] = ['client', 'server'];
 const REFLOWS: readonly ReflowMode[] = ['live', 'stable'];
@@ -850,7 +852,21 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   private _runEffects(attempt: (source: string, run: () => void) => void): void {
     const unreported = (): boolean =>
       this._ready && this._state.pageIndex !== this._reportedPageIndex;
+    let rounds = 0;
     while (this._owedRequest || unreported()) {
+      if (++rounds > MAX_EFFECT_ROUNDS) {
+        // A callback keeps navigating or refreshing (e.g. onPageRequest calling refresh()).
+        // Settle on the current state and fail loudly instead of hanging the page.
+        this._owedRequest = null;
+        this._reportedPageIndex = this._state.pageIndex;
+        attempt('the effects loop', () => {
+          throw new Error(
+            `items-grid: effects did not settle after ${MAX_EFFECT_ROUNDS} rounds; ` +
+              'onPageRequest or onPageChange keeps navigating or refreshing.'
+          );
+        });
+        return;
+      }
       const owed = this._owedRequest;
       if (owed) {
         this._owedRequest = null;
@@ -915,7 +931,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
         this._debouncedRequest();
       } catch (error) {
         // Nobody can catch a timer's error: report it with context instead.
-        console.error('items-grid: onPageRequest threw for a debounced page request.', error);
+        console.error('items-grid: a debounced page request failed.', error);
       }
     }, this._options.requestDebounceMs ?? DEFAULT_DEBOUNCE_MS);
   }

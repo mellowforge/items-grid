@@ -406,6 +406,18 @@ describe('mountItemsGrid', () => {
     errors.mockRestore();
   });
 
+  it('starts no observers when a callback destroys the grid during an update', () => {
+    const grid: ItemsGridMount<Entity> = mount({
+      onPageChange: () => {
+        grid.destroy();
+        mounted = null;
+      },
+    });
+    layout();
+    grid.update({ pageIndex: 2, measureRowHeight: true });
+    expect(ResizeObserverStub.instances.filter(observer => !observer.disconnected)).toHaveLength(0);
+  });
+
   it('warns once when the handle is used after destroy', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const grid = mount();

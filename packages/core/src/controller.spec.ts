@@ -1145,7 +1145,7 @@ describe('ItemsGridController — round 4 (effects re-entered from callbacks)', 
     controller.setViewportSize(NARROW);
     expect(() => vi.advanceTimersByTime(500)).not.toThrow();
     expect(errors).toHaveBeenCalledWith(
-      expect.stringContaining('items-grid: onPageRequest threw'),
+      expect.stringContaining('items-grid: a debounced page request failed'),
       expect.objectContaining({ message: 'offline' })
     );
     errors.mockRestore();
@@ -1161,5 +1161,41 @@ describe('ItemsGridController — round 4 (effects re-entered from callbacks)', 
     controller.next();
     expect(later).not.toHaveBeenCalled();
     expect(onStateChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('ItemsGridController — callbacks that never settle', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  it('fails loudly when onPageRequest keeps refreshing', () => {
+    let armed = false;
+    const controller: ItemsGridController<Entity> = setup({
+      mode: 'server',
+      items: entities(12),
+      total: 120,
+      onPageRequest: () => {
+        if (armed) controller.refresh();
+      },
+    });
+    armed = true;
+    expect(() => controller.next()).toThrow('items-grid: effects did not settle');
+  });
+
+  it('fails loudly when onPageChange keeps navigating past an unknown total', () => {
+    let armed = false;
+    const controller: ItemsGridController<Entity> = setup({
+      mode: 'server',
+      items: entities(12),
+      onPageChange: page => {
+        if (armed) controller.goTo(page + 1);
+      },
+    });
+    armed = true;
+    expect(() => controller.next()).toThrow('items-grid: effects did not settle');
+    // The grid stays usable afterwards.
+    armed = false;
+    expect(() => controller.goTo(0)).not.toThrow();
   });
 });
