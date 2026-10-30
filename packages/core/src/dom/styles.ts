@@ -4,7 +4,7 @@ import type { ItemsGridState } from '../controller';
  * Inline style declarations, keyed by CSS property name (kebab-case). Adapters apply them
  * directly, so the layout works without importing any stylesheet.
  */
-export type StyleDeclarations = Record<string, string>;
+export type StyleDeclarations = Readonly<Record<string, string>>;
 
 /**
  * Class names every adapter puts on the same elements. They are hooks for the optional
@@ -14,7 +14,9 @@ export const ITEMS_GRID_CLASSES = Object.freeze({
   host: 'qf-items-grid',
   viewport: 'qf-items-grid__viewport',
   cell: 'qf-items-grid__cell',
-  skeleton: 'qf-items-grid__cell qf-items-grid__cell--skeleton',
+  /** Modifier added next to `cell` on skeleton slots. */
+  skeleton: 'qf-items-grid__cell--skeleton',
+  /** Modifier added next to `cell` on the hidden measuring probe. */
   empty: 'qf-items-grid__empty',
   probe: 'qf-items-grid__probe',
   live: 'qf-items-grid__live',
@@ -35,7 +37,7 @@ export function getHostStyle(): StyleDeclarations {
  * from its content — otherwise measuring it would feed back into the page size.
  */
 export function getViewportStyle(state: ItemsGridState<unknown>): StyleDeclarations {
-  const style: StyleDeclarations = {
+  const style: Record<string, string> = {
     display: 'grid',
     flex: '1 1 0%',
     'min-height': '0',

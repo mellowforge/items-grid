@@ -224,6 +224,90 @@ describe('mountItemsGrid', () => {
     expect(cells()).toHaveLength(30); // 6 × 5 fit, 30 items exist
   });
 
+  it('navigates when update() changes pageIndex', () => {
+    const grid = mount();
+    layout();
+    grid.update({ pageIndex: 2 });
+    expect(texts()[0]).toBe('Entity 24');
+  });
+
+  it('renders a duplicate key once instead of corrupting the grid', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mount({ items: [...entities(3), { id: 1, name: 'Duplicate' }] });
+    layout();
+    expect(texts()).toEqual(['Entity 0', 'Entity 1', 'Entity 2']);
+    warn.mockRestore();
+  });
+
+  it('ignores PageDown typed into a field inside a card', () => {
+    mount({
+      renderItem: item => {
+        const card = document.createElement('article');
+        card.append(item.name, document.createElement('input'));
+        return card;
+      },
+    });
+    layout();
+    const event = new KeyboardEvent('keydown', {
+      key: 'PageDown',
+      bubbles: true,
+      cancelable: true,
+    });
+    cells()[0]!.querySelector('input')!.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(texts()[0]).toBe('Entity 0');
+  });
+
+  it('does not prevent keys other than PageUp and PageDown', () => {
+    mount();
+    layout();
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowDown',
+      bubbles: true,
+      cancelable: true,
+    });
+    cells()[0]!.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('pages back with PageUp', () => {
+    mount();
+    layout();
+    button('Next page').click();
+    cells()[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageUp', bubbles: true }));
+    expect(texts()[0]).toBe('Entity 0');
+  });
+
+  it('swaps skeletons for cards when loading ends', () => {
+    const grid = mount({
+      mode: 'server',
+      items: [],
+      loading: true,
+      renderSkeleton: () => document.createElement('div'),
+    });
+    layout();
+    grid.update({ items: entities(12), total: 30, loading: false });
+    expect(viewport().querySelectorAll('.qf-items-grid__cell--skeleton')).toHaveLength(0);
+    expect(cells()).toHaveLength(12);
+    expect(viewport().hasAttribute('aria-busy')).toBe(false);
+  });
+
+  it('is not a list while it shows the empty state', () => {
+    const grid = mount({ items: [], renderEmpty: () => document.createElement('p') });
+    layout();
+    expect(viewport().hasAttribute('role')).toBe(false);
+    grid.update({ items: entities(3) });
+    expect(viewport().getAttribute('role')).toBe('list');
+    expect(container.querySelector('.qf-items-grid__empty')).toBeNull();
+  });
+
+  it('refuses updates after destroy', () => {
+    const grid = mount();
+    grid.destroy();
+    mounted = null;
+    expect(() => grid.update({ items: [] })).toThrow('items-grid: update() after destroy()');
+  });
+
   it('removes everything it created and stops observing on destroy', () => {
     const grid = mount();
     layout();

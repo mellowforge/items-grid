@@ -521,3 +521,271 @@ describe('ItemsGridController — subscription', () => {
     expect(setup().getState().align).toBe('start');
   });
 });
+
+describe('ItemsGridController — mode switches', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  it('requests the page again after server → client → server', () => {
+    const requests: PageRequest[] = [];
+    const controller = setup({
+      mode: 'server',
+      items: [],
+      onPageRequest: request => requests.push(request),
+    });
+    controller.setOptions({ mode: 'client', items: entities(120) });
+    controller.setOptions({ mode: 'server', items: [], total: undefined });
+    expect(requests).toEqual([
+      { pageIndex: 0, pageSize: 12 },
+      { pageIndex: 0, pageSize: 12 },
+    ]);
+  });
+
+  it('requests immediately when switching into server mode', () => {
+    const requests: PageRequest[] = [];
+    const controller = setup({ onPageRequest: request => requests.push(request) });
+    controller.goTo(2);
+    controller.setOptions({ mode: 'server', items: [] });
+    expect(requests).toEqual([{ pageIndex: 2, pageSize: 12 }]);
+  });
+
+  it('drops a pending resize request when leaving server mode', () => {
+    const requests: PageRequest[] = [];
+    const controller = setup({
+      mode: 'server',
+      items: [],
+      total: 120,
+      onPageRequest: request => requests.push(request),
+    });
+    controller.setViewportSize(NARROW);
+    controller.setOptions({ mode: 'client', items: entities(120) });
+    vi.advanceTimersByTime(500);
+    expect(requests).toHaveLength(1);
+  });
+
+  it('drops a pending resize request when the viewport is hidden', () => {
+    const requests: PageRequest[] = [];
+    const controller = setup({
+      mode: 'server',
+      items: [],
+      total: 120,
+      onPageRequest: request => requests.push(request),
+    });
+    controller.setViewportSize(NARROW);
+    controller.setViewportSize({ width: 0, height: 0 });
+    vi.advanceTimersByTime(500);
+    expect(requests).toHaveLength(1);
+  });
+
+  it('requests again after destroy() and a remount', () => {
+    const requests: PageRequest[] = [];
+    const controller = setup({
+      mode: 'server',
+      items: [],
+      total: 120,
+      onPageRequest: request => requests.push(request),
+    });
+    controller.destroy();
+    controller.refresh();
+    expect(requests).toHaveLength(2);
+  });
+});
+
+describe('ItemsGridController — stable server baseline', () => {
+  it('does not count the dataset as new when the first total arrives', () => {
+    const controller = setup({ mode: 'server', items: [], reflow: 'stable' });
+    controller.setOptions({ items: entities(12), total: 500 });
+    expect(controller.getState().pendingCount).toBe(0);
+    controller.setOptions({ total: 503 });
+    expect(controller.getState().pendingCount).toBe(3);
+  });
+
+  it('does not count the dataset as new after switching from client to server', () => {
+    const controller = setup({ reflow: 'stable' });
+    controller.setOptions({ mode: 'server', items: [], total: undefined });
+    controller.setOptions({ items: entities(12), total: 120 });
+    expect(controller.getState().pendingCount).toBe(0);
+  });
+});
+
+describe('ItemsGridController — page index reporting', () => {
+  it('reports clamping on the first layout', () => {
+    const onPageChange = vi.fn();
+    const controller = setup({ pageIndex: 99, items: entities(30), onPageChange });
+    expect(controller.getState().pageIndex).toBe(2);
+    expect(onPageChange).toHaveBeenLastCalledWith(2);
+  });
+
+  it('reports reanchoring when a hidden grid is shown again', () => {
+    const onPageChange = vi.fn();
+    const controller = setup({ onPageChange });
+    controller.goTo(5);
+    controller.setViewportSize({ width: 0, height: 0 });
+    controller.setViewportSize(NARROW);
+    expect(onPageChange).toHaveBeenLastCalledWith(6);
+  });
+
+  it('reflects navigation while hidden in the state', () => {
+    const controller = setup();
+    controller.setViewportSize({ width: 0, height: 0 });
+    controller.goTo(3);
+    expect(controller.getState().pageIndex).toBe(3);
+  });
+
+  it('keeps a consistent state while hidden', () => {
+    const controller = setup();
+    controller.goTo(2);
+    controller.setViewportSize({ width: 0, height: 0 });
+    expect(controller.getState()).toMatchObject({
+      items: [],
+      range: { start: 0, end: 0 },
+      canNext: false,
+      canPrev: false,
+    });
+  });
+
+  it('navigates when the pageIndex option changes', () => {
+    const controller = setup();
+    controller.setOptions({ pageIndex: 3 });
+    expect(controller.getState().pageIndex).toBe(3);
+    controller.next();
+    controller.setOptions({ pageIndex: 3 }); // unchanged option: no navigation
+    expect(controller.getState().pageIndex).toBe(4);
+  });
+});
+
+describe('ItemsGridController — unknown server total', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  const unknown = (): { controller: ItemsGridController<Entity>; requests: PageRequest[] } => {
+    const requests: PageRequest[] = [];
+    const controller = setup({
+      mode: 'server',
+      items: entities(12),
+      total: undefined,
+      onPageRequest: request => requests.push(request),
+    });
+    return { controller, requests };
+  };
+
+  it('allows the next page while pages come back full', () => {
+    const { controller, requests } = unknown();
+    expect(controller.getState()).toMatchObject({ totalKnown: false, canNext: true });
+    controller.next();
+    expect(controller.getState().pageIndex).toBe(1);
+    expect(requests.at(-1)).toEqual({ pageIndex: 1, pageSize: 12 });
+  });
+
+  it('stops at a short page', () => {
+    const { controller } = unknown();
+    controller.setOptions({ items: entities(5) });
+    expect(controller.getState().canNext).toBe(false);
+  });
+
+  it('does not clamp goTo forward', () => {
+    const { controller } = unknown();
+    controller.goTo(3);
+    expect(controller.getState().pageIndex).toBe(3);
+  });
+
+  it('announces without a total', () => {
+    const { controller } = unknown();
+    controller.next();
+    expect(controller.getState().announcement).toBe('Page 2, items 13–24');
+  });
+
+  it('treats a null total as unknown', () => {
+    const { controller } = unknown();
+    controller.setOptions({ total: null as unknown as undefined });
+    expect(controller.getState()).toMatchObject({ totalKnown: false, canNext: true });
+  });
+});
+
+describe('ItemsGridController — validation', () => {
+  it('throws for an invalid preset value and keeps the previous options', () => {
+    const controller = setup();
+    expect(() =>
+      controller.setOptions({ presets: { normal: { minCardWidth: 0, gap: 8, rowHeight: 96 } } })
+    ).toThrow('items-grid: preset "normal" has an invalid minCardWidth (0)');
+    controller.setViewportSize(NARROW);
+    expect(controller.getState().pageSize).toBe(9);
+  });
+
+  it('rejects inherited object keys as preset names', () => {
+    expect(() => setup({ preset: 'toString' })).toThrow('unknown preset "toString"');
+  });
+
+  it.each([
+    ['pageIndex', { pageIndex: Number.NaN }],
+    ['total', { mode: 'server' as const, total: Number.NaN }],
+    ['maxColumns', { maxColumns: 0 }],
+    ['maxPageSize', { maxPageSize: -1 }],
+    ['requestDebounceMs', { requestDebounceMs: -5 }],
+    ['mode', { mode: 'Server' as unknown as 'server' }],
+  ])('throws for an invalid %s', (name, options) => {
+    expect(() => setup(options)).toThrow(`items-grid: invalid ${name}`);
+  });
+
+  it('throws for a non-finite goTo target', () => {
+    expect(() => setup().goTo(Number.NaN)).toThrow('items-grid: invalid pageIndex');
+  });
+
+  it('ignores explicit undefined for getKey and message overrides', () => {
+    const controller = setup();
+    controller.setOptions({ getKey: undefined as unknown as (item: Entity) => number });
+    controller.setOptions({ messages: { page: undefined } });
+    controller.next();
+    expect(controller.getState().announcement).toBe('Page 2 of 10, items 13–24 of 120');
+  });
+});
+
+describe('ItemsGridController — robustness', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  it('still requests and reports the page when a subscriber throws', () => {
+    const requests: PageRequest[] = [];
+    const onPageChange = vi.fn();
+    const controller = setup({
+      mode: 'server',
+      items: [],
+      total: 120,
+      onPageRequest: request => requests.push(request),
+      onPageChange,
+    });
+    controller.subscribe(() => {
+      throw new Error('render failed');
+    });
+    expect(() => controller.next()).toThrow('render failed');
+    expect(requests.at(-1)).toEqual({ pageIndex: 1, pageSize: 12 });
+    expect(onPageChange).toHaveBeenLastCalledWith(1);
+  });
+
+  it('warns once about duplicate keys on the page', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const controller = setup({ items: [...entities(3), { id: 1, status: 'dup' }] });
+    controller.setOptions({ items: [...entities(3), { id: 1, status: 'dup2' }] });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]![0]).toContain('duplicate key "1"');
+    warn.mockRestore();
+  });
+
+  it('freezes the state it hands out', () => {
+    const state = setup().getState();
+    expect(Object.isFrozen(state)).toBe(true);
+    expect(Object.isFrozen(state.items)).toBe(true);
+  });
+
+  it('binds the navigation methods', () => {
+    const controller = setup();
+    const { next, goTo } = controller;
+    next();
+    expect(controller.getState().pageIndex).toBe(1);
+    goTo(0);
+    expect(controller.getState().pageIndex).toBe(0);
+  });
+});

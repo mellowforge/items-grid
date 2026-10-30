@@ -47,101 +47,141 @@ export interface PageRequest {
 export interface PageMessageInfo {
   /** Zero-based page index. */
   readonly pageIndex: number;
+  /** Pages known so far (see {@link ItemsGridState.pageCount}). */
   readonly pageCount: number;
   /** Zero-based index of the first item on the page. */
   readonly start: number;
   /** Zero-based index one past the last item on the page. */
   readonly end: number;
+  /** Dataset size; only meaningful when `totalKnown`. */
   readonly total: number;
+  /** `false` in server mode while `total` is unknown. */
+  readonly totalKnown: boolean;
 }
 
 /** Screen-reader announcements. Override them to localize. */
 export interface ItemsGridMessages {
-  /** Announced after the visible page changes. Default: "Page 2 of 5, items 13–24 of 57". */
-  page(info: PageMessageInfo): string;
+  /**
+   * Announced after the visible page changes. Default: "Page 2 of 5, items 13–24 of 57",
+   * or "Page 2, items 13–24" while the server total is unknown.
+   */
+  readonly page: (info: PageMessageInfo) => string;
   /** Announced when stable mode counts new items. Default: "5 new items". */
-  newItems(count: number): string;
+  readonly newItems: (count: number) => string;
 }
 
-/** Default English announcements. */
-export const DEFAULT_MESSAGES: ItemsGridMessages = {
-  page: ({ pageIndex, pageCount, start, end, total }) =>
-    `Page ${pageIndex + 1} of ${pageCount}, items ${start + 1}–${end} of ${total}`,
-  newItems: count => `${count} new ${count === 1 ? 'item' : 'items'}`,
-};
+/** Default English announcements. Frozen; pass `messages` to override. */
+export const DEFAULT_MESSAGES: Readonly<ItemsGridMessages> = Object.freeze({
+  page: ({ pageIndex, pageCount, start, end, total, totalKnown }: PageMessageInfo) =>
+    totalKnown
+      ? `Page ${pageIndex + 1} of ${pageCount}, items ${start + 1}–${end} of ${total}`
+      : `Page ${pageIndex + 1}, items ${start + 1}–${end}`,
+  newItems: (count: number) => `${count} new ${count === 1 ? 'item' : 'items'}`,
+});
 
-/** Options for {@link ItemsGridController}. All but `getKey` are optional. */
+/**
+ * Options for {@link ItemsGridController}. All but `getKey` are optional. Invalid values
+ * throw an `items-grid:` error and leave the previous options in place.
+ */
 export interface ItemsGridOptions<T> {
   /**
    * Stable identity of an item. Keeps card DOM and state across updates, so it must not
-   * depend on the item's position.
+   * depend on the item's position, and must be unique (also as a string, for React).
    */
-  getKey: (item: T) => ItemKey;
-  /** Client mode: the whole dataset. Server mode: the current page. Default `[]`. */
-  items?: readonly T[];
+  readonly getKey: (item: T) => ItemKey;
+  /**
+   * Client mode: the whole dataset. Server mode: the current page. Default `[]`.
+   * Replace the array to update it; it is compared by identity, never mutated.
+   */
+  readonly items?: readonly T[];
   /** Default `'client'`. */
-  mode?: PagingMode;
-  /** Server mode: size of the whole dataset. Unknown while `undefined`. */
-  total?: number;
+  readonly mode?: PagingMode;
+  /**
+   * Server mode: size of the whole dataset, a non-negative integer. `undefined` (or `null`)
+   * means unknown: the page is never clamped, `canNext` is `true` while pages come back
+   * full, and `state.totalKnown` is `false`.
+   */
+  readonly total?: number | null;
   /** Name of the active preset in `presets`. Default `'normal'`. */
-  preset?: string;
+  readonly preset?: string;
   /** Available presets. Default {@link DEFAULT_PRESETS}. */
-  presets?: Readonly<Record<string, SizePreset>>;
+  readonly presets?: Readonly<Record<string, SizePreset>>;
   /**
-   * Measure the row height from a rendered sample card instead of using the preset's.
-   * The adapter renders a hidden probe of `sampleItem` (or the first item). Default `false`.
+   * Measure the row height from a hidden probe card (`sampleItem`, or the first item)
+   * instead of using the preset's; re-measured whenever the probe resizes. Default `false`.
    */
-  measureRowHeight?: boolean;
+  readonly measureRowHeight?: boolean;
   /** The item rendered in the measuring probe; defaults to the first item. */
-  sampleItem?: T;
-  /** Overrides the preset's `maxColumns`. */
-  maxColumns?: number;
-  /** Overrides the preset's `maxPageSize`. */
-  maxPageSize?: number;
+  readonly sampleItem?: T;
+  /** Overrides the preset's `maxColumns`; an integer ≥ 1. */
+  readonly maxColumns?: number;
+  /** Overrides the preset's `maxPageSize`; an integer ≥ 1. */
+  readonly maxPageSize?: number;
   /** Default `'live'`. */
-  reflow?: ReflowMode;
+  readonly reflow?: ReflowMode;
   /** Default `'start'` (leftover height below the last row). */
-  align?: GridAlign;
-  /** The app is fetching data; adapters render skeletons. Default `false`. */
-  loading?: boolean;
-  /** Zero-based page shown first. Default `0`. */
-  pageIndex?: number;
-  /** Server mode: delay before requesting a page after a resize, in ms. Default `150`. */
-  requestDebounceMs?: number;
-  /** Server mode: called when the grid needs a page the app has not supplied yet. */
-  onPageRequest?: (request: PageRequest) => void;
-  /** Called whenever the page index changes: navigation, reanchoring or clamping. */
-  onPageChange?: (pageIndex: number) => void;
+  readonly align?: GridAlign;
   /**
-   * Called with every new state, after subscribers. Lets app chrome outside the grid
-   * react to it, e.g. a "5 new items" banner from `pendingCount`.
+   * The app is fetching data; adapters render one skeleton per slot when given a skeleton
+   * renderer. In server mode set it in the same tick as `onPageRequest`, or the previous
+   * page's cards stay visible under the new page's numbers. Default `false`.
    */
-  onStateChange?: (state: ItemsGridState<T>) => void;
+  readonly loading?: boolean;
+  /**
+   * Zero-based page to show. Read at construction; afterwards a changed value navigates
+   * there (like `goTo`), an unchanged one is ignored. Default `0`.
+   */
+  readonly pageIndex?: number;
+  /**
+   * Server mode: delay before requesting after a page-size change (resize, preset, measured
+   * row height…), in ms, so a drag-resize sends one request. Navigation and `refresh()`
+   * request immediately. Default `150`.
+   */
+  readonly requestDebounceMs?: number;
+  /** Server mode: called when the grid needs a page the app has not supplied yet. */
+  readonly onPageRequest?: (request: PageRequest) => void;
+  /**
+   * Called whenever the page index changes: navigation, reanchoring after a resize or
+   * re-show, and clamping (including on the first layout).
+   */
+  readonly onPageChange?: (pageIndex: number) => void;
+  /**
+   * Called with every new state after subscribers, never for the state the constructor
+   * derives. Lets app chrome outside the grid react, e.g. a "5 new items" banner.
+   */
+  readonly onStateChange?: (state: ItemsGridState<T>) => void;
   /** Screen-reader announcements, merged over {@link DEFAULT_MESSAGES}. */
-  messages?: Partial<ItemsGridMessages>;
+  readonly messages?: Partial<ItemsGridMessages>;
 }
 
-/** Everything a view needs to render the current page. Immutable; replaced on change. */
+/** Everything a view needs to render the current page. Frozen; replaced on change. */
 export interface ItemsGridState<T> {
-  /** `null` until the viewport has been measured. */
+  /** `null` until the viewport has been measured (and while it is hidden). */
   readonly geometry: GridGeometry | null;
-  /** Cards per page; `0` until measured. */
+  /** Cards per page; always `geometry?.pageSize ?? 0`. */
   readonly pageSize: number;
   /** Zero-based current page. */
   readonly pageIndex: number;
+  /**
+   * Pages known so far. With a known total, `ceil(total / pageSize)` (at least the current
+   * page + 1); while the server total is unknown, the current page + 1, plus one more when
+   * `canNext`.
+   */
   readonly pageCount: number;
-  /** Dataset size (server mode: `total`, or the page length while unknown). */
+  /** Dataset size; while the server total is unknown, the items seen so far (`range.end`). */
   readonly total: number;
-  /** Indexes of the visible items within the dataset. */
+  /** `false` in server mode while `total` is unknown. */
+  readonly totalKnown: boolean;
+  /** Indexes of the visible items: `range.start` is `pageIndex × pageSize`. */
   readonly range: ItemRange;
   /** The cards to render on this page, in order. */
   readonly items: readonly T[];
   readonly loading: boolean;
   /** Skeleton cards to render while loading; `0` when not loading or not measured. */
   readonly skeletonCount: number;
-  /** No items and not loading: render the empty state. */
+  /** No items, a known total and not loading: render the empty state. */
   readonly isEmpty: boolean;
-  /** `true` in stable mode while the page is frozen. */
+  /** `true` in stable mode once the page is frozen (and its total known, in server mode). */
   readonly frozen: boolean;
   /** Stable mode: items that arrived since the page was frozen. */
   readonly pendingCount: number;
@@ -154,10 +194,68 @@ export interface ItemsGridState<T> {
   readonly announcement: string;
 }
 
-type SyncCause = 'options' | 'viewport' | 'measure' | 'navigate' | 'refresh';
+/**
+ * What apps get from the adapters: navigation and state, without the setters the adapter
+ * owns. All members are bound, so `onClick={grid.next}` works.
+ */
+export interface ItemsGridHandle<T> {
+  /** Shows `pageIndex` (clamped to the known pages); re-freezes a stable page. */
+  readonly goTo: (pageIndex: number) => void;
+  readonly next: () => void;
+  readonly prev: () => void;
+  readonly first: () => void;
+  readonly last: () => void;
+  /** Stable mode: shows the current data. Server mode: requests the current page again. */
+  readonly refresh: () => void;
+  /** Handles PageDown / PageUp; returns whether the key was handled. */
+  readonly handleKeydown: (key: string) => boolean;
+  readonly getState: () => ItemsGridState<T>;
+  readonly subscribe: (listener: () => void) => () => void;
+}
+
+type SyncCause = 'options' | 'mode' | 'viewport' | 'measure' | 'navigate' | 'refresh';
 
 const DEFAULT_DEBOUNCE_MS = 150;
 const EMPTY: readonly never[] = Object.freeze([]);
+const MODES: readonly PagingMode[] = ['client', 'server'];
+const REFLOWS: readonly ReflowMode[] = ['live', 'stable'];
+const ALIGNS: readonly GridAlign[] = ['start', 'center'];
+
+const invalid = (name: string, value: unknown): Error =>
+  new Error(`items-grid: invalid ${name} (${String(value)}).`);
+const isCount = (value: number): boolean => Number.isInteger(value) && value >= 0;
+const isCap = (value: number | undefined): boolean =>
+  value === undefined || (Number.isInteger(value) && value >= 1);
+
+/** `null` total means unknown, like `undefined`. */
+function normalize<T>(options: ItemsGridOptions<T>): ItemsGridOptions<T> {
+  return options.total === null ? { ...options, total: undefined } : options;
+}
+
+/** Throws an `items-grid:` error naming the first invalid option. */
+function validate<T>(options: ItemsGridOptions<T>): void {
+  if (typeof options.getKey !== 'function') throw invalid('getKey', options.getKey);
+  if (options.mode !== undefined && !MODES.includes(options.mode)) {
+    throw invalid('mode', options.mode);
+  }
+  if (options.reflow !== undefined && !REFLOWS.includes(options.reflow)) {
+    throw invalid('reflow', options.reflow);
+  }
+  if (options.align !== undefined && !ALIGNS.includes(options.align)) {
+    throw invalid('align', options.align);
+  }
+  if (options.total != null && !isCount(options.total)) throw invalid('total', options.total);
+  if (options.pageIndex !== undefined && !isCount(Math.floor(options.pageIndex))) {
+    throw invalid('pageIndex', options.pageIndex);
+  }
+  if (!isCap(options.maxColumns)) throw invalid('maxColumns', options.maxColumns);
+  if (!isCap(options.maxPageSize)) throw invalid('maxPageSize', options.maxPageSize);
+  const debounce = options.requestDebounceMs;
+  if (debounce !== undefined && !(Number.isFinite(debounce) && debounce >= 0)) {
+    throw invalid('requestDebounceMs', debounce);
+  }
+  resolvePreset(options.presets ?? DEFAULT_PRESETS, options.preset ?? DEFAULT_PRESET_NAME);
+}
 
 const sameGeometry = (a: GridGeometry | null, b: GridGeometry | null): boolean =>
   a === b ||
@@ -174,19 +272,28 @@ const sameItems = <T>(a: readonly T[], b: readonly T[]): boolean =>
 
 function sameState<T>(a: ItemsGridState<T>, b: ItemsGridState<T>): boolean {
   for (const key of Object.keys(a) as (keyof ItemsGridState<T>)[]) {
-    const left = a[key];
-    const right = b[key];
     if (key === 'geometry') {
       if (!sameGeometry(a.geometry, b.geometry)) return false;
     } else if (key === 'items') {
       if (!sameItems(a.items, b.items)) return false;
     } else if (key === 'range') {
       if (a.range.start !== b.range.start || a.range.end !== b.range.end) return false;
-    } else if (left !== right) {
+    } else if (a[key] !== b[key]) {
       return false;
     }
   }
   return true;
+}
+
+const freezeState = <T>(state: ItemsGridState<T>): ItemsGridState<T> => {
+  Object.freeze(state.range);
+  Object.freeze(state.items);
+  return Object.freeze(state);
+};
+
+/** Side effects of one sync, run after subscribers have seen the new state. */
+interface SyncEffects {
+  readonly request: { readonly immediate: boolean; readonly force: boolean } | 'cancel' | null;
 }
 
 /**
@@ -194,48 +301,81 @@ function sameState<T>(a: ItemsGridState<T>, b: ItemsGridState<T>): boolean {
  * page to render, and owns paging, reanchoring, stable-mode freezing and server page
  * requests. It is plain and non-reactive: adapters push inputs in (`setOptions`,
  * `setViewportSize`, `setMeasuredRowHeight`), `subscribe` to changes and read `getState()`.
+ * Apps get the narrower {@link ItemsGridHandle} from the adapters.
  *
  * It touches no DOM, so it is safe to create during server-side rendering.
  */
-export class ItemsGridController<T> {
+export class ItemsGridController<T> implements ItemsGridHandle<T> {
   private _options: ItemsGridOptions<T>;
   private _viewport: ViewportSize | null = null;
   private _measuredRowHeight: number | null = null;
   private _pageIndex: number;
   /** Index of the first item on the page at the last navigation; survives resizes. */
   private _anchorIndex: number | null = null;
+  /** Client stable mode: the frozen page. */
   private _snapshot: FreezeSnapshot | null = null;
-  private _totalAtSnapshot = 0;
+  /** Server stable mode: the known total when the page was frozen. */
+  private _baselineTotal: number | null = null;
   private _lastRequest: PageRequest | null = null;
   private _requestTimer: ReturnType<typeof setTimeout> | null = null;
   private _announcement = '';
   private _state: ItemsGridState<T>;
   private readonly _listeners = new Set<() => void>();
+  private readonly _warnedKeys = new Set<ItemKey>();
   /** `false` while the constructor derives the first state, which is never reported. */
   private _ready = false;
 
+  /** @throws an `items-grid:` error for invalid options. */
   constructor(options: ItemsGridOptions<T>) {
-    this._options = { ...options };
-    this._pageIndex = Math.max(0, Math.floor(options.pageIndex ?? 0));
-    this._state = this._buildInitialState();
+    const normalized = normalize({ ...options });
+    validate(normalized);
+    this._options = normalized;
+    this._pageIndex = Math.floor(normalized.pageIndex ?? 0);
+    this._state = freezeState(this._unmeasuredState(0, true, false, false));
     this._sync('options');
     this._ready = true;
   }
 
   // MARK: - Inputs
 
-  /** Merges new options. A call that changes nothing does not notify. */
+  /**
+   * Merges new options. A call that changes nothing does not notify. An explicit
+   * `undefined` for `getKey` is ignored.
+   *
+   * @throws an `items-grid:` error for invalid options; the previous options stay in place.
+   */
   setOptions(options: Partial<ItemsGridOptions<T>>): void {
     const previous = this._options;
-    const keys = Object.keys(options) as (keyof ItemsGridOptions<T>)[];
-    if (keys.every(key => previous[key] === options[key])) {
+    const { getKey, ...rest } = options;
+    const patch: Partial<ItemsGridOptions<T>> = getKey === undefined ? rest : options;
+    const keys = Object.keys(patch) as (keyof ItemsGridOptions<T>)[];
+    if (keys.every(key => previous[key] === patch[key])) {
       return;
     }
-    this._options = { ...previous, ...options };
-    if (previous.reflow !== this._options.reflow) {
-      this._snapshot = null;
+    const next = normalize({ ...previous, ...patch });
+    validate(next);
+    this._options = next;
+
+    const modeChanged = (previous.mode ?? 'client') !== (next.mode ?? 'client');
+    if (modeChanged) {
+      // A new data source: forget the last request and the frozen page.
+      this._cancelRequest();
+      this._lastRequest = null;
     }
-    this._sync('options');
+    if (modeChanged || previous.reflow !== next.reflow) {
+      this._snapshot = null;
+      this._baselineTotal = null;
+    }
+    this._sync(modeChanged ? 'mode' : 'options');
+
+    const pageIndex = next.pageIndex;
+    if (
+      pageIndex !== undefined &&
+      pageIndex !== previous.pageIndex &&
+      Math.floor(pageIndex) !== this._state.pageIndex
+    ) {
+      this.goTo(pageIndex);
+    }
   }
 
   /** Reports the viewport's content-box size. Adapters wire this to a ResizeObserver. */
@@ -254,52 +394,55 @@ export class ItemsGridController<T> {
     this._sync('measure');
   }
 
-  // MARK: - Navigation
+  // MARK: - Navigation (bound, so they can be passed around)
 
-  /** Shows `pageIndex`, clamped to the available pages. Re-freezes a stable page. */
-  goTo(pageIndex: number): void {
-    const geometry = this._state.geometry;
-    if (!geometry) {
-      // Not laid out (yet, or hidden): remember the page; it wins over any old anchor.
-      this._pageIndex = Math.max(0, Math.floor(pageIndex));
+  /**
+   * Shows `pageIndex`, clamped to the known pages (not clamped forward while the server
+   * total is unknown). Re-freezes a stable page. Before the grid is measured (or while it is
+   * hidden) the page is remembered and applied at the next layout.
+   *
+   * @throws an `items-grid:` error for a non-finite `pageIndex`.
+   */
+  readonly goTo = (pageIndex: number): void => {
+    if (!Number.isFinite(pageIndex)) throw invalid('pageIndex', pageIndex);
+    this._pageIndex = Math.max(0, Math.floor(pageIndex));
+    if (!this._state.geometry) {
+      // The explicit page wins over the anchor of an earlier layout.
       this._anchorIndex = null;
-      return;
     }
-    this._pageIndex = clampPageIndex(pageIndex, this._state.pageCount);
-    this._anchorIndex = this._pageIndex * geometry.pageSize;
     this._sync('navigate');
-  }
+  };
 
-  next(): void {
-    this.goTo(this._state.pageIndex + 1);
-  }
+  readonly next = (): void => {
+    if (this._state.canNext) this.goTo(this._state.pageIndex + 1);
+  };
 
-  prev(): void {
-    this.goTo(this._state.pageIndex - 1);
-  }
+  readonly prev = (): void => {
+    if (this._state.canPrev) this.goTo(this._state.pageIndex - 1);
+  };
 
-  first(): void {
+  readonly first = (): void => {
     this.goTo(0);
-  }
+  };
 
-  last(): void {
+  readonly last = (): void => {
     this.goTo(this._state.pageCount - 1);
-  }
+  };
 
   /**
    * Stable mode: shows the current data and clears `pendingCount`.
-   * Server mode: requests the current page again.
+   * Server mode: requests the current page again (also the way to retry a failed fetch).
    */
-  refresh(): void {
+  readonly refresh = (): void => {
     this._sync('refresh');
-  }
+  };
 
   /**
    * Handles paging keys pressed inside the grid: PageDown and PageUp.
    *
    * @returns whether the key was handled, so the adapter can `preventDefault()`.
    */
-  handleKeydown(key: string): boolean {
+  readonly handleKeydown = (key: string): boolean => {
     if (key === 'PageDown') {
       this.next();
       return true;
@@ -309,7 +452,7 @@ export class ItemsGridController<T> {
       return true;
     }
     return false;
-  }
+  };
 
   // MARK: - Output
 
@@ -325,35 +468,44 @@ export class ItemsGridController<T> {
   };
 
   /**
-   * Cancels a pending page request and drops every listener. The controller stays usable:
-   * subscribing again resumes updates, which React StrictMode's remount relies on.
+   * Cancels a pending page request, forgets the last one and drops every listener. The
+   * controller stays usable: subscribing again resumes updates (React StrictMode remounts
+   * rely on it), and the next layout requests its page again.
    */
   destroy(): void {
     this._cancelRequest();
+    this._lastRequest = null;
     this._listeners.clear();
   }
 
   // MARK: - Derivation
 
-  private _buildInitialState(): ItemsGridState<T> {
+  private _unmeasuredState(
+    total: number,
+    totalKnown: boolean,
+    loading: boolean,
+    isEmpty: boolean
+  ): ItemsGridState<T> {
+    const options = this._options;
     return {
       geometry: null,
       pageSize: 0,
       pageIndex: this._pageIndex,
       pageCount: 1,
-      total: 0,
+      total,
+      totalKnown,
       range: { start: 0, end: 0 },
       items: EMPTY,
-      loading: false,
+      loading,
       skeletonCount: 0,
-      isEmpty: false,
+      isEmpty,
       frozen: false,
       pendingCount: 0,
       canPrev: false,
       canNext: false,
-      align: 'start',
-      probeItem: undefined,
-      announcement: '',
+      align: options.align ?? 'start',
+      probeItem: options.measureRowHeight ? (options.sampleItem ?? options.items?.[0]) : undefined,
+      announcement: this._announcement,
     };
   }
 
@@ -373,112 +525,131 @@ export class ItemsGridController<T> {
       maxColumns: options.maxColumns,
       maxPageSize: options.maxPageSize,
     });
-    const total = Math.max(0, isServer ? (options.total ?? items.length) : items.length);
+    const totalKnown = !isServer || options.total != null;
+    const knownTotal = isServer ? (options.total ?? 0) : items.length;
     const loading = !!options.loading;
-    // In server mode an unknown total (before the first response) is not "empty".
-    const isEmpty = !loading && total === 0 && (!isServer || options.total !== undefined);
+    // An unknown server total (e.g. before the first response) is not "empty".
+    const isEmpty = !loading && totalKnown && knownTotal === 0;
 
     if (!geometry) {
-      this._commit({
-        ...previous,
-        geometry: null,
-        pageSize: 0,
-        total,
-        items: EMPTY,
-        loading,
-        skeletonCount: 0,
-        isEmpty,
-        align: options.align ?? 'start',
-        probeItem: options.measureRowHeight ? (options.sampleItem ?? items[0]) : undefined,
-      });
+      // Not laid out (yet, or hidden): nothing is paged and nothing may be requested.
+      this._finish(
+        freezeState(
+          this._unmeasuredState(
+            totalKnown ? knownTotal : items.length,
+            totalKnown,
+            loading,
+            isEmpty
+          )
+        ),
+        previous,
+        { request: 'cancel' }
+      );
       return;
     }
 
     const { pageSize } = geometry;
     const firstLayout = previous.geometry === null;
     const pageSizeChanged = !firstLayout && previous.pageSize !== pageSize;
-    // Server mode before the first response: the total is unknown, so nothing may clamp
-    // the page (e.g. right after switching modes), and only known pages are shown.
-    const unknownTotal = isServer && options.total === undefined;
-    const boundTotal = unknownTotal ? Number.MAX_SAFE_INTEGER : total;
-    const pageCount = unknownTotal ? 1 : getPageCount(total, pageSize);
+    // While the server total is unknown nothing may clamp the page.
+    const boundTotal = totalKnown ? knownTotal : Number.MAX_SAFE_INTEGER;
+    const boundPageCount = getPageCount(boundTotal, pageSize);
     let pageIndex = this._pageIndex;
-    let freeze = cause === 'navigate' || cause === 'refresh' || firstLayout || pageSizeChanged;
-    let requestNow = cause === 'navigate' || cause === 'refresh' || firstLayout;
+    const freeze =
+      cause === 'navigate' ||
+      cause === 'refresh' ||
+      cause === 'mode' ||
+      firstLayout ||
+      pageSizeChanged;
+    let requestNow = cause === 'navigate' || cause === 'refresh' || cause === 'mode' || firstLayout;
 
     if (firstLayout) {
-      // A grid shown again after being hidden (size 0) keeps its anchor, like a resize.
+      // A grid shown again after being hidden keeps its anchor, like a resize.
       pageIndex =
         this._anchorIndex === null
-          ? clampPageIndex(pageIndex, getPageCount(boundTotal, pageSize))
+          ? clampPageIndex(pageIndex, boundPageCount)
           : reanchor(this._anchorIndex, pageSize, boundTotal);
-      this._anchorIndex ??= pageIndex * pageSize;
     } else if (pageSizeChanged) {
       const anchor = this._anchorIndex ?? previous.pageIndex * previous.pageSize;
       this._anchorIndex = anchor;
       pageIndex = reanchor(anchor, pageSize, boundTotal);
     } else if (!stable || freeze) {
-      const clamped = clampPageIndex(pageIndex, getPageCount(boundTotal, pageSize));
+      const clamped = clampPageIndex(pageIndex, boundPageCount);
       if (clamped !== pageIndex) {
         pageIndex = clamped;
         requestNow = true;
       }
     }
-    if (stable && !this._snapshot) {
-      freeze = true;
+    if (firstLayout || cause === 'navigate') {
+      this._anchorIndex =
+        firstLayout && this._anchorIndex !== null ? this._anchorIndex : pageIndex * pageSize;
     }
 
     // Page contents.
     let pageItems: readonly T[];
     let range: ItemRange;
+    let pendingCount = 0;
+    let frozen = false;
     if (isServer) {
-      if (stable && freeze) {
-        this._snapshot = { pageKeys: [], knownKeys: new Set() };
-        this._totalAtSnapshot = total;
+      pageItems = items.slice(0, pageSize);
+      const start = pageIndex * pageSize;
+      range = totalKnown
+        ? getPageRange(pageIndex, pageSize, knownTotal)
+        : { start, end: start + pageItems.length };
+      if (stable) {
+        // The baseline is the known total when the page froze; set it once the total is known.
+        if (freeze || this._baselineTotal === null || !previous.totalKnown) {
+          this._baselineTotal = totalKnown ? knownTotal : null;
+        }
+        frozen = this._baselineTotal !== null;
+        pendingCount = frozen ? Math.max(0, knownTotal - this._baselineTotal!) : 0;
       }
-      pageItems = items.length > pageSize ? items.slice(0, pageSize) : items;
-      range = unknownTotal
-        ? { start: pageIndex * pageSize, end: pageIndex * pageSize + pageItems.length }
-        : getPageRange(pageIndex, pageSize, total);
     } else if (stable) {
       const freezeAt = (index: number): void => {
         this._snapshot = createSnapshot(
           items,
           options.getKey,
-          getPageRange(index, pageSize, total)
+          getPageRange(index, pageSize, knownTotal)
         );
       };
-      if (freeze) {
+      if (freeze || !this._snapshot) {
         freezeAt(pageIndex);
       }
       pageItems = resolveFrozenPage(this._snapshot!, items, options.getKey);
-      if (pageItems.length === 0 && total > 0) {
+      if (pageItems.length === 0 && knownTotal > 0) {
         // Every frozen card is gone: show what is there now instead of an empty page.
-        pageIndex = clampPageIndex(pageIndex, pageCount);
+        pageIndex = clampPageIndex(pageIndex, boundPageCount);
         freezeAt(pageIndex);
         pageItems = resolveFrozenPage(this._snapshot!, items, options.getKey);
       }
       const start = pageIndex * pageSize;
       range = { start, end: start + pageItems.length };
+      frozen = true;
+      pendingCount = countPending(this._snapshot!, items, options.getKey);
     } else {
-      range = getPageRange(pageIndex, pageSize, total);
+      range = getPageRange(pageIndex, pageSize, knownTotal);
       pageItems = items.slice(range.start, range.end);
     }
     if (!stable) {
       this._snapshot = null;
+      this._baselineTotal = null;
     }
     this._pageIndex = pageIndex;
+    this._warnDuplicates(pageItems);
 
-    const pendingCount =
-      stable && this._snapshot
-        ? isServer
-          ? Math.max(0, total - this._totalAtSnapshot)
-          : countPending(this._snapshot, items, options.getKey)
-        : 0;
-    const shownPageCount = Math.max(pageCount, pageIndex + 1);
+    const total = totalKnown ? knownTotal : range.end;
+    let pageCount: number;
+    let canNext: boolean;
+    if (totalKnown) {
+      pageCount = Math.max(getPageCount(knownTotal, pageSize), pageIndex + 1);
+      canNext = pageIndex < pageCount - 1;
+    } else {
+      // Unknown total: a full page suggests there is more.
+      canNext = pageItems.length >= pageSize;
+      pageCount = pageIndex + (canNext ? 2 : 1);
+    }
 
     // Announcements: the page after it moves, then new items when they arrive.
-    const messages = { ...DEFAULT_MESSAGES, ...options.messages };
     if (
       !firstLayout &&
       (pageIndex !== previous.pageIndex ||
@@ -486,57 +657,105 @@ export class ItemsGridController<T> {
         range.end !== previous.range.end ||
         cause === 'navigate')
     ) {
-      this._announcement = messages.page({
+      const page = options.messages?.page ?? DEFAULT_MESSAGES.page;
+      this._announcement = page({
         pageIndex,
-        pageCount: shownPageCount,
+        pageCount,
         start: range.start,
         end: range.end,
         total,
+        totalKnown,
       });
     } else if (pendingCount > previous.pendingCount) {
-      this._announcement = messages.newItems(pendingCount);
+      const newItems = options.messages?.newItems ?? DEFAULT_MESSAGES.newItems;
+      this._announcement = newItems(pendingCount);
     }
 
-    this._commit({
-      geometry,
-      pageSize,
-      pageIndex,
-      pageCount: shownPageCount,
-      total,
-      range,
-      items: pageItems,
-      loading,
-      skeletonCount: loading
-        ? getSkeletonCount(pageIndex, pageSize, isServer ? options.total : undefined)
-        : 0,
-      isEmpty,
-      frozen: stable && this._snapshot !== null,
-      pendingCount,
-      canPrev: pageIndex > 0,
-      canNext: pageIndex < shownPageCount - 1,
-      align: options.align ?? 'start',
-      probeItem: options.measureRowHeight ? (options.sampleItem ?? items[0]) : undefined,
-      announcement: this._announcement,
-    });
+    this._finish(
+      freezeState({
+        geometry,
+        pageSize,
+        pageIndex,
+        pageCount,
+        total,
+        totalKnown,
+        range,
+        items: pageItems,
+        loading,
+        skeletonCount: loading
+          ? getSkeletonCount(pageIndex, pageSize, totalKnown && isServer ? knownTotal : undefined)
+          : 0,
+        isEmpty,
+        frozen,
+        pendingCount,
+        canPrev: pageIndex > 0,
+        canNext,
+        align: options.align ?? 'start',
+        probeItem: options.measureRowHeight ? (options.sampleItem ?? items[0]) : undefined,
+        announcement: this._announcement,
+      }),
+      previous,
+      { request: isServer ? { immediate: requestNow, force: cause === 'refresh' } : 'cancel' }
+    );
+  }
 
-    if (isServer) {
-      this._request({ pageIndex, pageSize }, requestNow, cause === 'refresh');
+  /**
+   * Commits the state, then runs the side effects — even when a subscriber throws, so a
+   * failing render never swallows a page request or a page-change report. The first
+   * subscriber error is rethrown afterwards.
+   */
+  private _finish(
+    next: ItemsGridState<T>,
+    previous: ItemsGridState<T>,
+    effects: SyncEffects
+  ): void {
+    let failure: { error: unknown } | null = null;
+    if (!sameState(this._state, next)) {
+      this._state = next;
+      for (const listener of [...this._listeners]) {
+        try {
+          listener();
+        } catch (error) {
+          failure ??= { error };
+        }
+      }
+      if (this._ready) {
+        try {
+          this._options.onStateChange?.(next);
+        } catch (error) {
+          failure ??= { error };
+        }
+      }
     }
-    if (!firstLayout && pageIndex !== previous.pageIndex) {
-      options.onPageChange?.(pageIndex);
+    if (effects.request === 'cancel') {
+      this._cancelRequest();
+    } else if (effects.request) {
+      this._request(
+        { pageIndex: next.pageIndex, pageSize: next.pageSize },
+        effects.request.immediate,
+        effects.request.force
+      );
+    }
+    if (this._ready && next.pageIndex !== previous.pageIndex) {
+      this._options.onPageChange?.(next.pageIndex);
+    }
+    if (failure) {
+      throw failure.error;
     }
   }
 
-  private _commit(next: ItemsGridState<T>): void {
-    if (sameState(this._state, next)) {
-      return;
-    }
-    this._state = next;
-    for (const listener of [...this._listeners]) {
-      listener();
-    }
-    if (this._ready) {
-      this._options.onStateChange?.(next);
+  private _warnDuplicates(items: readonly T[]): void {
+    const seen = new Set<ItemKey>();
+    for (const item of items) {
+      const key = this._options.getKey(item);
+      if (seen.has(key) && !this._warnedKeys.has(key)) {
+        this._warnedKeys.add(key);
+        console.warn(
+          `items-grid: getKey returned the duplicate key "${String(key)}"; cards with the same ` +
+            'key replace each other. Keys must be unique.'
+        );
+      }
+      seen.add(key);
     }
   }
 
@@ -557,13 +776,17 @@ export class ItemsGridController<T> {
       this._emitRequest(request);
       return;
     }
-    // Resize-driven: wait until the size settles so a drag-resize sends one request.
+    // Page-size change: wait until the size settles so a drag-resize sends one request.
     this._cancelRequest();
     this._requestTimer = setTimeout(() => {
       this._requestTimer = null;
       const { pageIndex, pageSize } = this._state;
       const latest = this._lastRequest;
-      if (latest && latest.pageIndex === pageIndex && latest.pageSize === pageSize) {
+      if (
+        this._options.mode !== 'server' ||
+        pageSize <= 0 ||
+        (latest && latest.pageIndex === pageIndex && latest.pageSize === pageSize)
+      ) {
         return;
       }
       this._emitRequest({ pageIndex, pageSize });

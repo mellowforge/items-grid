@@ -6,6 +6,7 @@ export {
   DEFAULT_MESSAGES,
   ItemsGridController,
   type GridAlign,
+  type ItemsGridHandle,
   type ItemsGridMessages,
   type ItemsGridOptions,
   type ItemsGridState,
@@ -32,6 +33,7 @@ export {
 } from './engine/presets';
 export type { GridGeometry, ItemKey, ItemRange, SizePreset, ViewportSize } from './engine/types';
 export { DEFAULT_PAGER_LABELS, type PagerLabels } from './pager';
+export { isEditableTarget } from './dom/keyboard';
 export { observeSize, type ObserveSizeOptions } from './dom/observe';
 export {
   getCellStyle,

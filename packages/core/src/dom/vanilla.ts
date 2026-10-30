@@ -1,7 +1,13 @@
-import { ItemsGridController, type ItemsGridOptions, type ItemsGridState } from '../controller';
+import {
+  ItemsGridController,
+  type ItemsGridHandle,
+  type ItemsGridOptions,
+  type ItemsGridState,
+} from '../controller';
 import { getPagerItems, type PagerItem } from '../engine/paging';
 import type { ItemKey } from '../engine/types';
 import { DEFAULT_PAGER_LABELS, type PagerLabels } from '../pager';
+import { isEditableTarget } from './keyboard';
 import { observeSize } from './observe';
 import {
   getCellStyle,
@@ -16,33 +22,42 @@ import {
 
 /** Options for {@link mountItemsGrid}: the controller options plus how to render. */
 export interface MountItemsGridOptions<T> extends ItemsGridOptions<T> {
-  /** Creates the card element for an item. Called once per key while it stays visible. */
-  renderItem(item: T, index: number): HTMLElement;
+  /**
+   * Creates the card element for an item: once per key while it stays visible, again after
+   * a skeleton phase, and for the measuring probe (with index `0`). `index` is
+   * `range.start` + the card's offset on the page, captured when the card is created.
+   */
+  readonly renderItem: (item: T, index: number) => HTMLElement;
   /**
    * Updates a card in place when its key's item object changes (e.g. a status update).
    * Without it the card is re-rendered with `renderItem`, which drops its DOM state.
    */
-  updateItem?(element: HTMLElement, item: T, index: number): void;
+  readonly updateItem?: (element: HTMLElement, item: T, index: number) => void;
   /** Creates one skeleton card; rendered once per slot while `loading`. */
-  renderSkeleton?(slot: number): HTMLElement;
+  readonly renderSkeleton?: (slot: number) => HTMLElement;
   /** Creates the empty state; rendered over the whole viewport when there are no items. */
-  renderEmpty?(): HTMLElement;
+  readonly renderEmpty?: () => HTMLElement;
   /** Render the built-in pager below the grid. Default `true`. */
-  pager?: boolean;
+  readonly pager?: boolean;
   /** Accessible name of the card list. */
-  ariaLabel?: string;
+  readonly ariaLabel?: string;
   /** Pager texts, merged over {@link DEFAULT_PAGER_LABELS}. */
-  pagerLabels?: Partial<PagerLabels>;
+  readonly pagerLabels?: Partial<PagerLabels>;
 }
 
 /** A mounted grid. */
 export interface ItemsGridMount<T> {
-  /** The underlying controller, for navigation (`next()`, `goTo()`…) and state. */
-  readonly controller: ItemsGridController<T>;
-  /** Merges new options and re-renders. A new `renderItem` rebuilds every card. */
-  update(options: Partial<MountItemsGridOptions<T>>): void;
+  /** Navigation (`next()`, `goTo()`, `refresh()`…) and state. */
+  readonly controller: ItemsGridHandle<T>;
+  /**
+   * Merges new options and re-renders. A new `renderItem` rebuilds every card; a changed
+   * `pageIndex` navigates there.
+   *
+   * @throws an `items-grid:` error for invalid options, or after `destroy()`.
+   */
+  readonly update: (options: Partial<MountItemsGridOptions<T>>) => void;
   /** Removes everything the grid added to the container and stops observing. */
-  destroy(): void;
+  readonly destroy: () => void;
 }
 
 interface CardEntry<T> {
@@ -111,13 +126,14 @@ export function mountItemsGrid<T>(
   applyStyle(container, getHostStyle());
 
   const viewport = create('div', CLASSES.viewport);
-  viewport.setAttribute('role', 'list');
   const live = create('div', CLASSES.live, getVisuallyHiddenStyle());
   live.setAttribute('aria-live', 'polite');
   container.append(viewport, live);
 
   const onKeydown = (event: KeyboardEvent): void => {
-    if (controller.handleKeydown(event.key)) event.preventDefault();
+    if (!isEditableTarget(event.target) && controller.handleKeydown(event.key)) {
+      event.preventDefault();
+    }
   };
   viewport.addEventListener('keydown', onKeydown);
 
@@ -144,7 +160,7 @@ export function mountItemsGrid<T>(
       for (const entry of cards.values()) entry.cell.remove();
       cards.clear();
       while (skeletons.length < state.skeletonCount) {
-        const cell = create('div', CLASSES.skeleton, getCellStyle());
+        const cell = create('div', `${CLASSES.cell} ${CLASSES.skeleton}`, getCellStyle());
         cell.setAttribute('aria-hidden', 'true');
         cell.append(options.renderSkeleton(skeletons.length));
         skeletons.push(cell);
@@ -159,6 +175,8 @@ export function mountItemsGrid<T>(
     state.items.forEach((item, offset) => {
       const index = state.range.start + offset;
       const key = options.getKey(item);
+      // A duplicate key would steal the first card's element; the controller warns about it.
+      if (seen.has(key)) return;
       seen.add(key);
       let entry = cards.get(key);
       if (!entry) {
@@ -241,7 +259,9 @@ export function mountItemsGrid<T>(
       pager = { nav, status, list, prev, next, slots: [] };
     }
     pager.nav.setAttribute('aria-label', labels.navigation);
-    pager.status.textContent = state.loading ? '' : labels.status(state.range, state.total);
+    pager.status.textContent = state.loading
+      ? ''
+      : labels.status(state.range, state.total, state.totalKnown);
     pager.prev.setAttribute('aria-label', labels.previous);
     pager.next.setAttribute('aria-label', labels.next);
     pager.prev.disabled = !state.canPrev;
@@ -285,6 +305,9 @@ export function mountItemsGrid<T>(
   function render(): void {
     const state = controller.getState();
     viewportStyle = applyStyle(viewport, getViewportStyle(state), viewportStyle);
+    // The empty state is not a list item, so the viewport is only a list while it has cards.
+    if (state.isEmpty) viewport.removeAttribute('role');
+    else viewport.setAttribute('role', 'list');
     if (options.ariaLabel) viewport.setAttribute('aria-label', options.ariaLabel);
     else viewport.removeAttribute('aria-label');
     if (state.loading) viewport.setAttribute('aria-busy', 'true');
@@ -312,12 +335,14 @@ export function mountItemsGrid<T>(
     if (live.textContent !== state.announcement) live.textContent = state.announcement;
   }
 
+  let destroyed = false;
   const unsubscribe = controller.subscribe(render);
   render();
 
   return {
     controller,
     update(next) {
+      if (destroyed) throw new Error('items-grid: update() after destroy().');
       if (next.renderItem && next.renderItem !== options.renderItem) {
         // A new renderer means new markup: rebuild every card (and the probe).
         for (const entry of cards.values()) entry.cell.remove();
@@ -336,6 +361,8 @@ export function mountItemsGrid<T>(
       render();
     },
     destroy() {
+      if (destroyed) return;
+      destroyed = true;
       unsubscribe();
       stopViewport();
       probe?.stop();

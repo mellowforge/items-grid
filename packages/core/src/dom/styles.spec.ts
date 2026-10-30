@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ItemsGridState } from '../controller';
-import { getProbeStyle, getViewportStyle } from './styles';
+import { getProbeStyle, getViewportStyle, ITEMS_GRID_CLASSES } from './styles';
 
 const state = (overrides: Partial<ItemsGridState<unknown>>): ItemsGridState<unknown> =>
   ({
@@ -51,5 +51,13 @@ describe('getProbeStyle', () => {
 
   it('is full width before the viewport is measured', () => {
     expect(getProbeStyle(state({ geometry: null })).width).toBe('100%');
+  });
+});
+
+describe('ITEMS_GRID_CLASSES', () => {
+  it('holds single class names, usable with classList and selectors', () => {
+    for (const value of Object.values(ITEMS_GRID_CLASSES)) {
+      expect(value).not.toContain(' ');
+    }
   });
 });
