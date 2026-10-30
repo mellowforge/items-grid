@@ -1,5 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import {
+  afterNextRender,
   Component,
   computed,
   contentChild,
@@ -22,8 +23,10 @@ import {
   getViewportStyle,
   getVisuallyHiddenStyle,
   type GridAlign,
+  isEditableTarget,
   type ItemKey,
   ItemsGridController,
+  type ItemsGridHandle,
   type ItemsGridMessages,
   type ItemsGridState,
   observeSize,
@@ -57,7 +60,7 @@ import { QfItemsGridEmpty, QfItemsGridItem, QfItemsGridSkeleton } from './items-
     <div
       #viewport
       class="qf-items-grid__viewport"
-      role="list"
+      [attr.role]="state().isEmpty ? null : 'list'"
       [attr.aria-label]="ariaLabel() ?? null"
       [attr.aria-busy]="state().loading ? 'true' : null"
       [style]="viewportStyle()"
@@ -110,7 +113,11 @@ import { QfItemsGridEmpty, QfItemsGridItem, QfItemsGridSkeleton } from './items-
       }
     </div>
     @if (pager()) {
-      <qf-items-grid-pager [controller]="controller" [state]="state()" [labels]="pagerLabels()" />
+      <qf-items-grid-pager
+        [controller]="controller"
+        [state]="state()"
+        [labels]="pagerLabels() ?? undefined"
+      />
     }
     <div class="qf-items-grid__live" [style]="liveStyle" aria-live="polite">
       {{ state().announcement }}
@@ -120,7 +127,7 @@ import { QfItemsGridEmpty, QfItemsGridItem, QfItemsGridSkeleton } from './items-
 export class QfItemsGrid<T> {
   // MARK: - Inputs
 
-  /** Client mode: the whole dataset. Server mode: the current page. */
+  /** Client mode: the whole dataset. Server mode: the current page. Replace, don't mutate. */
   readonly items = input<readonly T[]>([]);
 
   /** Stable identity of an item; must not depend on its position. */
@@ -129,8 +136,11 @@ export class QfItemsGrid<T> {
   /** `'client'` (default) slices `items`; `'server'` requests pages via `pageRequest`. */
   readonly mode = input<PagingMode>('client');
 
-  /** Server mode: size of the whole dataset; unknown while `undefined`. */
-  readonly total = input<number | undefined>(undefined);
+  /**
+   * Server mode: size of the whole dataset. `undefined` / `null` means unknown: the page is
+   * never clamped and `canNext` stays true while pages come back full.
+   */
+  readonly total = input<number | null | undefined>(undefined);
 
   /** Name of the active preset. Default `'normal'`. */
   readonly preset = input<string | undefined>(undefined);
@@ -205,8 +215,10 @@ export class QfItemsGrid<T> {
 
   // MARK: - State
 
-  /** The core controller, for imperative navigation (`next()`, `goTo()`, `refresh()`). */
-  readonly controller: ItemsGridController<T>;
+  /** Navigation (`next()`, `goTo()`, `refresh()`…) and state; the component owns the inputs. */
+  readonly controller: ItemsGridHandle<T>;
+
+  private readonly _controller: ItemsGridController<T>;
 
   /**
    * Monotonic version bumped by every controller notification; `state` reads it to
@@ -217,7 +229,7 @@ export class QfItemsGrid<T> {
   /** The current render state. */
   readonly state = computed<ItemsGridState<T>>(() => {
     this._version();
-    return this.controller.getState();
+    return this._controller.getState();
   });
 
   protected readonly hostStyle = getHostStyle();
@@ -237,7 +249,7 @@ export class QfItemsGrid<T> {
 
   constructor() {
     // Callbacks read the latest inputs untracked, so option changes never rebuild anything.
-    this.controller = new ItemsGridController<T>({
+    this._controller = new ItemsGridController<T>({
       getKey: (item) => untracked(this.getKey)(item),
       onPageRequest: (request) => this.pageRequest.emit(request),
       onPageChange: (pageIndex) => this.pageIndexChange.emit(pageIndex),
@@ -248,9 +260,11 @@ export class QfItemsGrid<T> {
           (untracked(this.messages)?.newItems ?? DEFAULT_MESSAGES.newItems)(count),
       },
     });
-    const unsubscribe = this.controller.subscribe(() => this._version.update((v) => v + 1));
+    this.controller = this._controller;
+    const unsubscribe = this._controller.subscribe(() => this._version.update((v) => v + 1));
 
-    // Every scalar input flows through one effect; the controller ignores unchanged values.
+    // Every option input flows through one effect; the controller ignores unchanged values,
+    // and a changed pageIndex navigates (so `[(pageIndex)]` binds two-way).
     effect(() => {
       const options = {
         items: this.items(),
@@ -265,37 +279,40 @@ export class QfItemsGrid<T> {
         reflow: this.reflow(),
         align: this.align(),
         loading: this.loading(),
+        pageIndex: this.pageIndex(),
         requestDebounceMs: this.requestDebounceMs(),
       };
-      untracked(() => this.controller.setOptions(options));
-    });
-
-    effect(() => {
-      const pageIndex = this.pageIndex();
-      untracked(() => {
-        if (pageIndex !== this.controller.getState().pageIndex) this.controller.goTo(pageIndex);
-      });
+      untracked(() => this._controller.setOptions(options));
     });
 
     effect((onCleanup) => {
       const viewport = this._viewport().nativeElement;
-      onCleanup(observeSize(viewport, (size) => this.controller.setViewportSize(size)));
+      onCleanup(observeSize(viewport, (size) => this._controller.setViewportSize(size)));
     });
 
     effect((onCleanup) => {
       const probe = this._probe()?.nativeElement;
       if (probe) {
         onCleanup(
-          observeSize(probe, (size) => this.controller.setMeasuredRowHeight(size.height), {
+          observeSize(probe, (size) => this._controller.setMeasuredRowHeight(size.height), {
             box: 'border',
           }),
         );
       }
     });
 
+    afterNextRender(() => {
+      if (!this.itemDef()) {
+        console.warn(
+          'items-grid: <qf-items-grid> has no ng-template[qfItemsGridItem], so its cards render ' +
+            'empty. Add one and import QfItemsGridItem into the component.',
+        );
+      }
+    });
+
     inject(DestroyRef).onDestroy(() => {
       unsubscribe();
-      this.controller.destroy();
+      this._controller.destroy();
     });
   }
 
@@ -304,7 +321,7 @@ export class QfItemsGrid<T> {
   }
 
   protected onKeydown(event: KeyboardEvent): void {
-    if (this.controller.handleKeydown(event.key)) {
+    if (!isEditableTarget(event.target) && this._controller.handleKeydown(event.key)) {
       event.preventDefault();
     }
   }

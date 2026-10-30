@@ -1,10 +1,10 @@
 import { Component, computed, input } from '@angular/core';
 import {
-  DEFAULT_PAGER_LABELS,
   getPagerItems,
-  type ItemsGridController,
+  type ItemsGridHandle,
   type ItemsGridState,
   type PagerLabels,
+  resolvePagerLabels,
 } from '@quietfoundry/items-grid-core';
 
 /**
@@ -23,7 +23,7 @@ import {
   },
   template: `
     <span class="qf-items-grid-pager__status">{{
-      state().loading ? '' : text().status(state().range, state().total)
+      state().loading ? '' : text().status(state().range, state().total, state().totalKnown)
     }}</span>
     <div class="qf-items-grid-pager__list">
       <button
@@ -64,9 +64,8 @@ import {
   `,
 })
 export class QfItemsGridPager {
-  /** The grid's controller. */
-  readonly controller =
-    input.required<Pick<ItemsGridController<unknown>, 'goTo' | 'next' | 'prev'>>();
+  /** The grid's handle: `grid.controller`. */
+  readonly controller = input.required<Pick<ItemsGridHandle<unknown>, 'goTo' | 'next' | 'prev'>>();
 
   /** The grid's current state. */
   readonly state = input.required<ItemsGridState<unknown>>();
@@ -74,10 +73,7 @@ export class QfItemsGridPager {
   /** Texts, merged over the defaults. */
   readonly labels = input<Partial<PagerLabels>>();
 
-  protected readonly text = computed<PagerLabels>(() => ({
-    ...DEFAULT_PAGER_LABELS,
-    ...this.labels(),
-  }));
+  protected readonly text = computed<PagerLabels>(() => resolvePagerLabels(this.labels()));
 
   protected readonly items = computed(() =>
     getPagerItems(this.state().pageIndex, this.state().pageCount),
