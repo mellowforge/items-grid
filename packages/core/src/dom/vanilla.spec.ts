@@ -301,6 +301,82 @@ describe('mountItemsGrid', () => {
     expect(container.querySelector('.qf-items-grid__empty')).toBeNull();
   });
 
+  it('rejects an invalid update without changing anything', () => {
+    const grid = mount({ ariaLabel: 'Entities' });
+    layout();
+    const renamed = (item: Entity): HTMLElement => {
+      const card = document.createElement('article');
+      card.textContent = `New ${item.name}`;
+      return card;
+    };
+    expect(() =>
+      grid.update({ renderItem: renamed, preset: 'bogus', ariaLabel: 'Changed' })
+    ).toThrow('unknown preset "bogus"');
+    expect(cells()).toHaveLength(12);
+    button('Next page').click();
+    expect(texts()[0]).toBe('Entity 12');
+    expect(viewport().getAttribute('aria-label')).toBe('Entities');
+  });
+
+  it('ignores explicit undefined for getKey and renderItem', () => {
+    const grid = mount();
+    layout();
+    grid.update({ getKey: undefined, renderItem: undefined, items: entities(20) } as Partial<
+      MountItemsGridOptions<Entity>
+    >);
+    expect(texts()[0]).toBe('Entity 0');
+  });
+
+  it('keeps the pager status blank until the grid is measured', () => {
+    mount();
+    expect(container.querySelector('.qf-items-grid-pager__status')!.textContent).toBe('');
+  });
+
+  it('does not page when a card already handled the key', () => {
+    mount({
+      renderItem: item => {
+        const card = document.createElement('article');
+        card.textContent = item.name;
+        card.addEventListener('keydown', event => event.preventDefault());
+        return card;
+      },
+    });
+    layout();
+    cells()[0]!.firstElementChild!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'PageDown', bubbles: true, cancelable: true })
+    );
+    expect(texts()[0]).toBe('Entity 0');
+  });
+
+  it('turns the handle inert after destroy', () => {
+    const onPageChange = vi.fn();
+    const grid = mount({ onPageChange });
+    layout();
+    grid.destroy();
+    mounted = null;
+    grid.controller.goTo(2);
+    expect(onPageChange).not.toHaveBeenCalled();
+    expect(() => grid.destroy()).not.toThrow();
+  });
+
+  it('sends no page request after destroy', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const requests: unknown[] = [];
+    const grid = mount({
+      mode: 'server',
+      items: [],
+      onPageRequest: request => requests.push(request),
+    });
+    layout();
+    ResizeObserverStub.for(viewport()).fire(976, 552);
+    flushFrames();
+    grid.destroy();
+    mounted = null;
+    vi.advanceTimersByTime(500);
+    vi.useRealTimers();
+    expect(requests).toHaveLength(1);
+  });
+
   it('refuses updates after destroy', () => {
     const grid = mount();
     grid.destroy();

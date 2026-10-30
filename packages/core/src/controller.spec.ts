@@ -587,7 +587,8 @@ describe('ItemsGridController — mode switches', () => {
       onPageRequest: request => requests.push(request),
     });
     controller.destroy();
-    controller.refresh();
+    controller.setViewportSize({ width: 0, height: 0 });
+    controller.setViewportSize(WIDE);
     expect(requests).toHaveLength(2);
   });
 });
@@ -699,7 +700,7 @@ describe('ItemsGridController — unknown server total', () => {
 
   it('treats a null total as unknown', () => {
     const { controller } = unknown();
-    controller.setOptions({ total: null as unknown as undefined });
+    controller.setOptions({ total: null });
     expect(controller.getState()).toMatchObject({ totalKnown: false, canNext: true });
   });
 });
@@ -787,5 +788,177 @@ describe('ItemsGridController — robustness', () => {
     expect(controller.getState().pageIndex).toBe(1);
     goTo(0);
     expect(controller.getState().pageIndex).toBe(0);
+  });
+});
+
+describe('ItemsGridController — round 2', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  it('keeps pageCount consistent with pageIndex while hidden', () => {
+    const controller = setup();
+    controller.goTo(3);
+    controller.setViewportSize({ width: 0, height: 0 });
+    expect(controller.getState()).toMatchObject({ pageIndex: 3, pageCount: 4 });
+    controller.last();
+    controller.setViewportSize(WIDE);
+    expect(controller.getState().pageIndex).toBe(3);
+  });
+
+  it.each([
+    ['a string pageIndex', { pageIndex: '3' as unknown as number }],
+    ['a null pageIndex', { pageIndex: null as unknown as number }],
+    ['a string total', { mode: 'server' as const, total: '10' as unknown as number }],
+    ['items that are not an array', { items: { length: 3 } as unknown as Entity[] }],
+    ['a non-function message', { messages: { page: 'x' as unknown as () => string } }],
+  ])('rejects %s without storing anything', (_, patch) => {
+    const controller = setup();
+    const before = controller.getState();
+    expect(() => controller.setOptions({ ...patch, align: 'center' })).toThrow(
+      'items-grid: invalid'
+    );
+    expect(controller.getState()).toBe(before);
+    controller.setOptions({ align: 'center' });
+    expect(controller.getState().align).toBe('center');
+  });
+
+  it('prints rejected values unambiguously', () => {
+    expect(() => setup({ pageIndex: '3' as unknown as number })).toThrow('invalid pageIndex ("3")');
+  });
+
+  it('restores the previous options when the sync itself throws', () => {
+    const controller = setup();
+    const throwing = (): never => {
+      throw new Error('bad key');
+    };
+    expect(() => controller.setOptions({ getKey: throwing, items: entities(5) })).toThrow(
+      'bad key'
+    );
+    controller.setViewportSize(NARROW);
+    expect(controller.getState().items).toHaveLength(9);
+  });
+
+  it('applies a pageIndex change in the same sync, even when a subscriber throws', () => {
+    const controller = setup();
+    let fail = true;
+    controller.subscribe(() => {
+      if (fail) {
+        fail = false;
+        throw new Error('render failed');
+      }
+    });
+    expect(() => controller.setOptions({ items: entities(119), pageIndex: 5 })).toThrow(
+      'render failed'
+    );
+    expect(controller.getState().pageIndex).toBe(5);
+  });
+
+  it('sends one request when mode and pageIndex change together', () => {
+    const requests: PageRequest[] = [];
+    const controller = setup({ onPageRequest: request => requests.push(request) });
+    controller.goTo(3);
+    controller.setOptions({ mode: 'server', items: [], pageIndex: 0 });
+    expect(requests).toEqual([{ pageIndex: 0, pageSize: 12 }]);
+  });
+
+  it('does not navigate again when pageIndex echoes the current page', () => {
+    const controller = setup({ reflow: 'stable' });
+    controller.next();
+    controller.setOptions({ items: [...entities(2, 1000), ...entities(120)] });
+    const listener = vi.fn();
+    controller.subscribe(listener);
+    controller.setOptions({ pageIndex: 1 });
+    expect(listener).not.toHaveBeenCalled();
+    expect(controller.getState().pendingCount).toBe(2);
+  });
+
+  it('runs only the newest effects when a callback navigates during a notification', () => {
+    const requests: number[] = [];
+    const pages: number[] = [];
+    let redirected = false;
+    const controller = setup({
+      mode: 'server',
+      items: [],
+      total: 120,
+      onPageRequest: request => requests.push(request.pageIndex),
+      onPageChange: page => pages.push(page),
+    });
+    controller.setOptions({
+      onStateChange: state => {
+        if (state.pageIndex === 3 && !redirected) {
+          redirected = true;
+          controller.goTo(7);
+        }
+      },
+    });
+    controller.goTo(3);
+    expect(controller.getState().pageIndex).toBe(7);
+    expect(requests.at(-1)).toBe(7);
+    expect(pages.at(-1)).toBe(7);
+  });
+
+  it('reports the page change even when onPageRequest throws, and keeps every subscriber running', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onPageChange = vi.fn();
+    const second = vi.fn();
+    const controller = setup({
+      mode: 'server',
+      items: [],
+      total: 120,
+      onPageRequest: request => {
+        if (request.pageIndex === 2) throw new Error('request failed');
+      },
+      onPageChange,
+    });
+    controller.subscribe(() => {
+      throw new Error('first subscriber');
+    });
+    controller.subscribe(second);
+    expect(() => controller.goTo(2)).toThrow('first subscriber');
+    expect(second).toHaveBeenCalled();
+    expect(onPageChange).toHaveBeenLastCalledWith(2);
+    expect(errors).toHaveBeenCalledWith(expect.objectContaining({ message: 'request failed' }));
+    errors.mockRestore();
+  });
+
+  it('clamps a stable server page whose total shrank below it', () => {
+    const requests: PageRequest[] = [];
+    const controller = setup({
+      mode: 'server',
+      items: entities(12),
+      total: 100,
+      reflow: 'stable',
+      onPageRequest: request => requests.push(request),
+    });
+    controller.goTo(5);
+    controller.setOptions({ total: 30 });
+    expect(controller.getState()).toMatchObject({ pageIndex: 2, range: { start: 24, end: 30 } });
+    expect(requests.at(-1)).toEqual({ pageIndex: 2, pageSize: 12 });
+  });
+
+  it('keeps the stable baseline across a brief unknown total, but is not frozen meanwhile', () => {
+    const controller = setup({ mode: 'server', items: [], total: 100, reflow: 'stable' });
+    controller.setOptions({ total: 105 });
+    controller.setOptions({ total: null });
+    expect(controller.getState()).toMatchObject({ frozen: false, pendingCount: 0 });
+    controller.setOptions({ total: 107 });
+    expect(controller.getState()).toMatchObject({ frozen: true, pendingCount: 7 });
+  });
+
+  it('warns about keys that collide as strings', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    setup({
+      items: [
+        { id: 1, status: 'a' },
+        { id: '1' as unknown as number, status: 'b' },
+      ],
+    });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('duplicate key "1"'));
+    warn.mockRestore();
+  });
+
+  it('freezes the geometry too', () => {
+    expect(Object.isFrozen(setup().getState().geometry)).toBe(true);
   });
 });

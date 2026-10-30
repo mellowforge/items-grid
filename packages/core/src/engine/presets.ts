@@ -31,11 +31,13 @@ export function resolvePreset(
   name: string
 ): SizePreset {
   if (!Object.prototype.hasOwnProperty.call(presets, name)) {
-    throw new Error(
-      `items-grid: unknown preset "${name}". Known presets: ${Object.keys(presets).join(', ')}.`
-    );
+    const known = Object.keys(presets).join(', ') || '(none)';
+    throw new Error(`items-grid: unknown preset "${name}". Known presets: ${known}.`);
   }
-  const preset = presets[name]!;
+  const preset = presets[name];
+  if (typeof preset !== 'object' || preset === null) {
+    throw new Error(`items-grid: preset "${name}" is not a preset object (${String(preset)}).`);
+  }
   const invalid = (field: keyof SizePreset): never => {
     throw new Error(
       `items-grid: preset "${name}" has an invalid ${field} (${String(preset[field])}).`

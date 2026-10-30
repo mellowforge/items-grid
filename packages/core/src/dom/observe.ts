@@ -29,8 +29,7 @@ export function observeSize(
       warnedUnavailable = true;
       console.warn(
         'items-grid: ResizeObserver is unavailable, so the grid cannot measure its viewport and ' +
-          'stays empty. Polyfill it (e.g. in jsdom tests) or report sizes yourself with ' +
-          'ItemsGridController.setViewportSize().'
+          'stays empty. Polyfill it (e.g. in jsdom tests).'
       );
     }
     return () => {};

@@ -7,7 +7,7 @@ import {
 import { getPagerItems, type PagerItem } from '../engine/paging';
 import type { ItemKey } from '../engine/types';
 import { type PagerLabels, resolvePagerLabels } from '../pager';
-import { isEditableTarget } from './keyboard';
+import { shouldPageGrid } from './keyboard';
 import { observeSize } from './observe';
 import {
   getCellStyle,
@@ -131,7 +131,7 @@ export function mountItemsGrid<T>(
   container.append(viewport, live);
 
   const onKeydown = (event: KeyboardEvent): void => {
-    if (!isEditableTarget(event.target) && controller.handleKeydown(event.key)) {
+    if (shouldPageGrid(event) && controller.handleKeydown(event.key)) {
       event.preventDefault();
     }
   };
@@ -259,9 +259,10 @@ export function mountItemsGrid<T>(
       pager = { nav, status, list, prev, next, slots: [] };
     }
     pager.nav.setAttribute('aria-label', labels.navigation);
-    pager.status.textContent = state.loading
-      ? ''
-      : labels.status(state.range, state.total, state.totalKnown);
+    pager.status.textContent =
+      state.loading || !state.geometry
+        ? ''
+        : labels.status(state.range, state.total, state.totalKnown);
     pager.prev.setAttribute('aria-label', labels.previous);
     pager.next.setAttribute('aria-label', labels.next);
     pager.prev.disabled = !state.canPrev;
@@ -339,10 +340,42 @@ export function mountItemsGrid<T>(
   const unsubscribe = controller.subscribe(render);
   render();
 
+  // The handle goes inert after destroy(), so late calls can't reach app callbacks.
+  const handle: ItemsGridHandle<T> = {
+    goTo: pageIndex => {
+      if (!destroyed) controller.goTo(pageIndex);
+    },
+    next: () => {
+      if (!destroyed) controller.next();
+    },
+    prev: () => {
+      if (!destroyed) controller.prev();
+    },
+    first: () => {
+      if (!destroyed) controller.first();
+    },
+    last: () => {
+      if (!destroyed) controller.last();
+    },
+    refresh: () => {
+      if (!destroyed) controller.refresh();
+    },
+    handleKeydown: key => !destroyed && controller.handleKeydown(key),
+    getState: controller.getState,
+    subscribe: listener => (destroyed ? () => {} : controller.subscribe(listener)),
+  };
+
   return {
-    controller,
-    update(next) {
+    controller: handle,
+    update(patch) {
       if (destroyed) throw new Error('items-grid: update() after destroy().');
+      // Explicit undefined for a required callback means "keep the current one".
+      const next: Partial<MountItemsGridOptions<T>> = { ...patch };
+      for (const key of ['getKey', 'renderItem'] as const) {
+        if (key in next && next[key] === undefined) delete next[key];
+      }
+      // Validate first: a rejected update must not touch the DOM or the mount's options.
+      controller.setOptions(controllerOptions(next));
       if (next.renderItem && next.renderItem !== options.renderItem) {
         // A new renderer means new markup: rebuild every card (and the probe).
         for (const entry of cards.values()) entry.cell.remove();
@@ -357,7 +390,6 @@ export function mountItemsGrid<T>(
         skeletons.splice(0).forEach(cell => cell.remove());
       }
       options = { ...options, ...next };
-      controller.setOptions(controllerOptions(next));
       render();
     },
     destroy() {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_PRESETS, resolvePreset } from './presets';
+import type { SizePreset } from './types';
 
 describe('resolvePreset', () => {
   it('returns a built-in preset by name', () => {
@@ -29,5 +30,17 @@ describe('resolvePreset — validation', () => {
     expect(() => resolvePreset({ custom: preset }, 'custom')).toThrow(
       `items-grid: preset "custom" has an invalid ${field}`
     );
+  });
+});
+
+describe('resolvePreset — malformed input', () => {
+  it('names the preset when its value is not an object', () => {
+    expect(() => resolvePreset({ broken: null as unknown as SizePreset }, 'broken')).toThrow(
+      'items-grid: preset "broken" is not a preset object'
+    );
+  });
+
+  it('says when no presets are defined', () => {
+    expect(() => resolvePreset({}, 'normal')).toThrow('Known presets: (none).');
   });
 });

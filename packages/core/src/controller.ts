@@ -221,8 +221,12 @@ const MODES: readonly PagingMode[] = ['client', 'server'];
 const REFLOWS: readonly ReflowMode[] = ['live', 'stable'];
 const ALIGNS: readonly GridAlign[] = ['start', 'center'];
 
+const describe = (value: unknown): string =>
+  typeof value === 'string' ? JSON.stringify(value) : String(value);
 const invalid = (name: string, value: unknown): Error =>
-  new Error(`items-grid: invalid ${name} (${String(value)}).`);
+  new Error(`items-grid: invalid ${name} (${describe(value)}).`);
+const isNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
 const isCount = (value: number): boolean => Number.isInteger(value) && value >= 0;
 const isCap = (value: number | undefined): boolean =>
   value === undefined || (Number.isInteger(value) && value >= 1);
@@ -245,13 +249,22 @@ function validate<T>(options: ItemsGridOptions<T>): void {
     throw invalid('align', options.align);
   }
   if (options.total != null && !isCount(options.total)) throw invalid('total', options.total);
-  if (options.pageIndex !== undefined && !isCount(Math.floor(options.pageIndex))) {
+  if (options.pageIndex !== undefined && !(isNumber(options.pageIndex) && options.pageIndex >= 0)) {
     throw invalid('pageIndex', options.pageIndex);
+  }
+  if (options.items !== undefined && !Array.isArray(options.items)) {
+    throw invalid('items', options.items);
+  }
+  for (const name of ['page', 'newItems'] as const) {
+    const message = options.messages?.[name];
+    if (message !== undefined && typeof message !== 'function') {
+      throw invalid(`messages.${name}`, message);
+    }
   }
   if (!isCap(options.maxColumns)) throw invalid('maxColumns', options.maxColumns);
   if (!isCap(options.maxPageSize)) throw invalid('maxPageSize', options.maxPageSize);
   const debounce = options.requestDebounceMs;
-  if (debounce !== undefined && !(Number.isFinite(debounce) && debounce >= 0)) {
+  if (debounce !== undefined && !(isNumber(debounce) && debounce >= 0)) {
     throw invalid('requestDebounceMs', debounce);
   }
   resolvePreset(options.presets ?? DEFAULT_PRESETS, options.preset ?? DEFAULT_PRESET_NAME);
@@ -286,10 +299,23 @@ function sameState<T>(a: ItemsGridState<T>, b: ItemsGridState<T>): boolean {
 }
 
 const freezeState = <T>(state: ItemsGridState<T>): ItemsGridState<T> => {
+  if (state.geometry) Object.freeze(state.geometry);
   Object.freeze(state.range);
   Object.freeze(state.items);
   return Object.freeze(state);
 };
+
+/** Errors collected during a sync; the first is rethrown, the rest are logged. */
+interface Failure {
+  readonly errors: readonly unknown[];
+}
+
+function rethrow(failure: Failure | null): void {
+  if (!failure) return;
+  const [first, ...rest] = failure.errors;
+  for (const error of rest) console.error(error);
+  throw first;
+}
 
 /** Side effects of one sync, run after subscribers have seen the new state. */
 interface SyncEffects {
@@ -321,9 +347,11 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   private _announcement = '';
   private _state: ItemsGridState<T>;
   private readonly _listeners = new Set<() => void>();
-  private readonly _warnedKeys = new Set<ItemKey>();
+  private readonly _warnedKeys = new Set<string>();
   /** `false` while the constructor derives the first state, which is never reported. */
   private _ready = false;
+  /** Bumped by every commit, so a sync can tell that a callback ran a newer one. */
+  private _generation = 0;
 
   /** @throws an `items-grid:` error for invalid options. */
   constructor(options: ItemsGridOptions<T>) {
@@ -332,7 +360,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     this._options = normalized;
     this._pageIndex = Math.floor(normalized.pageIndex ?? 0);
     this._state = freezeState(this._unmeasuredState(0, true, false, false));
-    this._sync('options');
+    rethrow(this._sync('options'));
     this._ready = true;
   }
 
@@ -354,8 +382,16 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     }
     const next = normalize({ ...previous, ...patch });
     validate(next);
-    this._options = next;
 
+    // Everything below is undone if deriving the new state throws (e.g. a throwing getKey).
+    const saved = {
+      snapshot: this._snapshot,
+      baselineTotal: this._baselineTotal,
+      lastRequest: this._lastRequest,
+      pageIndex: this._pageIndex,
+      anchorIndex: this._anchorIndex,
+    };
+    this._options = next;
     const modeChanged = (previous.mode ?? 'client') !== (next.mode ?? 'client');
     if (modeChanged) {
       // A new data source: forget the last request and the frozen page.
@@ -366,22 +402,35 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
       this._snapshot = null;
       this._baselineTotal = null;
     }
-    this._sync(modeChanged ? 'mode' : 'options');
-
-    const pageIndex = next.pageIndex;
-    if (
-      pageIndex !== undefined &&
-      pageIndex !== previous.pageIndex &&
-      Math.floor(pageIndex) !== this._state.pageIndex
-    ) {
-      this.goTo(pageIndex);
+    // A changed pageIndex navigates in the same sync (one request, one report).
+    const navigated =
+      next.pageIndex !== undefined &&
+      next.pageIndex !== previous.pageIndex &&
+      Math.floor(next.pageIndex) !== this._state.pageIndex;
+    if (navigated) {
+      this._pageIndex = Math.floor(next.pageIndex!);
+      if (!this._state.geometry) this._anchorIndex = null;
     }
+
+    let failure: Failure | null;
+    try {
+      failure = this._sync(modeChanged ? 'mode' : navigated ? 'navigate' : 'options');
+    } catch (error) {
+      this._options = previous;
+      this._snapshot = saved.snapshot;
+      this._baselineTotal = saved.baselineTotal;
+      this._lastRequest = saved.lastRequest;
+      this._pageIndex = saved.pageIndex;
+      this._anchorIndex = saved.anchorIndex;
+      throw error;
+    }
+    rethrow(failure);
   }
 
   /** Reports the viewport's content-box size. Adapters wire this to a ResizeObserver. */
   setViewportSize(size: ViewportSize): void {
     this._viewport = { width: size.width, height: size.height };
-    this._sync('viewport');
+    rethrow(this._sync('viewport'));
   }
 
   /** Reports the measured card height, or `null` to fall back to the preset's. */
@@ -391,7 +440,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
       return;
     }
     this._measuredRowHeight = next;
-    this._sync('measure');
+    rethrow(this._sync('measure'));
   }
 
   // MARK: - Navigation (bound, so they can be passed around)
@@ -410,7 +459,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
       // The explicit page wins over the anchor of an earlier layout.
       this._anchorIndex = null;
     }
-    this._sync('navigate');
+    rethrow(this._sync('navigate'));
   };
 
   readonly next = (): void => {
@@ -434,7 +483,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
    * Server mode: requests the current page again (also the way to retry a failed fetch).
    */
   readonly refresh = (): void => {
-    this._sync('refresh');
+    rethrow(this._sync('refresh'));
   };
 
   /**
@@ -491,7 +540,8 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
       geometry: null,
       pageSize: 0,
       pageIndex: this._pageIndex,
-      pageCount: 1,
+      // Nothing is paged yet, but the remembered page must stay addressable (e.g. by last()).
+      pageCount: this._pageIndex + 1,
       total,
       totalKnown,
       range: { start: 0, end: 0 },
@@ -509,7 +559,11 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     };
   }
 
-  private _sync(cause: SyncCause): void {
+  /**
+   * Derives and commits the state for `cause`. Throws only before committing; errors from
+   * subscribers and callbacks are collected and returned for the caller to rethrow.
+   */
+  private _sync(cause: SyncCause): Failure | null {
     const options = this._options;
     const items = options.items ?? EMPTY;
     const isServer = options.mode === 'server';
@@ -533,19 +587,13 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
 
     if (!geometry) {
       // Not laid out (yet, or hidden): nothing is paged and nothing may be requested.
-      this._finish(
+      return this._finish(
         freezeState(
-          this._unmeasuredState(
-            totalKnown ? knownTotal : items.length,
-            totalKnown,
-            loading,
-            isEmpty
-          )
+          this._unmeasuredState(totalKnown ? knownTotal : 0, totalKnown, loading, isEmpty)
         ),
         previous,
         { request: 'cancel' }
       );
-      return;
     }
 
     const { pageSize } = geometry;
@@ -573,7 +621,8 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
       const anchor = this._anchorIndex ?? previous.pageIndex * previous.pageSize;
       this._anchorIndex = anchor;
       pageIndex = reanchor(anchor, pageSize, boundTotal);
-    } else if (!stable || freeze) {
+    } else if (!stable || freeze || (isServer && totalKnown && pageIndex >= boundPageCount)) {
+      // Stable pages hold still, except a server page that no longer exists at all.
       const clamped = clampPageIndex(pageIndex, boundPageCount);
       if (clamped !== pageIndex) {
         pageIndex = clamped;
@@ -597,11 +646,14 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
         ? getPageRange(pageIndex, pageSize, knownTotal)
         : { start, end: start + pageItems.length };
       if (stable) {
-        // The baseline is the known total when the page froze; set it once the total is known.
-        if (freeze || this._baselineTotal === null || !previous.totalKnown) {
-          this._baselineTotal = totalKnown ? knownTotal : null;
+        // The baseline is the known total when the page froze, taken once the total is known;
+        // a brief unknown total (e.g. while refetching) keeps it.
+        if (freeze && !totalKnown) {
+          this._baselineTotal = null;
+        } else if (totalKnown && (freeze || this._baselineTotal === null)) {
+          this._baselineTotal = knownTotal;
         }
-        frozen = this._baselineTotal !== null;
+        frozen = totalKnown && this._baselineTotal !== null;
         pendingCount = frozen ? Math.max(0, knownTotal - this._baselineTotal!) : 0;
       }
     } else if (stable) {
@@ -671,7 +723,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
       this._announcement = newItems(pendingCount);
     }
 
-    this._finish(
+    return this._finish(
       freezeState({
         geometry,
         pageSize,
@@ -701,57 +753,58 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
 
   /**
    * Commits the state, then runs the side effects — even when a subscriber throws, so a
-   * failing render never swallows a page request or a page-change report. The first
-   * subscriber error is rethrown afterwards.
+   * failing render never swallows a page request or a page-change report. If a subscriber
+   * or callback synced again meanwhile (e.g. navigated), its newer effects already ran and
+   * these stale ones are skipped. Every error is collected and returned.
    */
   private _finish(
     next: ItemsGridState<T>,
     previous: ItemsGridState<T>,
     effects: SyncEffects
-  ): void {
-    let failure: { error: unknown } | null = null;
+  ): Failure | null {
+    const generation = ++this._generation;
+    const errors: unknown[] = [];
+    const attempt = (run: () => void): void => {
+      try {
+        run();
+      } catch (error) {
+        errors.push(error);
+      }
+    };
     if (!sameState(this._state, next)) {
       this._state = next;
-      for (const listener of [...this._listeners]) {
-        try {
-          listener();
-        } catch (error) {
-          failure ??= { error };
-        }
+      for (const listener of [...this._listeners]) attempt(listener);
+      if (this._ready) attempt(() => this._options.onStateChange?.(next));
+    }
+    if (generation === this._generation) {
+      const request = effects.request;
+      if (request === 'cancel') {
+        this._cancelRequest();
+      } else if (request) {
+        attempt(() =>
+          this._request(
+            { pageIndex: next.pageIndex, pageSize: next.pageSize },
+            request.immediate,
+            request.force
+          )
+        );
       }
-      if (this._ready) {
-        try {
-          this._options.onStateChange?.(next);
-        } catch (error) {
-          failure ??= { error };
-        }
+      if (this._ready && next.pageIndex !== previous.pageIndex) {
+        attempt(() => this._options.onPageChange?.(next.pageIndex));
       }
     }
-    if (effects.request === 'cancel') {
-      this._cancelRequest();
-    } else if (effects.request) {
-      this._request(
-        { pageIndex: next.pageIndex, pageSize: next.pageSize },
-        effects.request.immediate,
-        effects.request.force
-      );
-    }
-    if (this._ready && next.pageIndex !== previous.pageIndex) {
-      this._options.onPageChange?.(next.pageIndex);
-    }
-    if (failure) {
-      throw failure.error;
-    }
+    return errors.length ? { errors } : null;
   }
 
   private _warnDuplicates(items: readonly T[]): void {
-    const seen = new Set<ItemKey>();
+    // Compared as strings: React keys (and many DOM ids) collapse 1 and '1'.
+    const seen = new Set<string>();
     for (const item of items) {
-      const key = this._options.getKey(item);
+      const key = String(this._options.getKey(item));
       if (seen.has(key) && !this._warnedKeys.has(key)) {
         this._warnedKeys.add(key);
         console.warn(
-          `items-grid: getKey returned the duplicate key "${String(key)}"; cards with the same ` +
+          `items-grid: getKey returned the duplicate key "${key}"; cards with the same ` +
             'key replace each other. Keys must be unique.'
         );
       }
