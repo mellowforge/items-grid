@@ -5,8 +5,9 @@ import {
   getProbeStyle,
   getViewportStyle,
   getVisuallyHiddenStyle,
+  isEditableTarget,
   ITEMS_GRID_CLASSES as CLASSES,
-  type ItemsGridController,
+  type ItemsGridHandle,
   type ItemsGridOptions,
   type ItemsGridState,
   type PagerLabels,
@@ -34,12 +35,15 @@ const LIVE_STYLE = toReactStyle(getVisuallyHiddenStyle());
 /** What a custom `pager` render function receives. */
 export interface ItemsGridPagerContext<T> {
   readonly state: ItemsGridState<T>;
-  readonly controller: ItemsGridController<T>;
+  readonly controller: ItemsGridHandle<T>;
 }
 
 /** Props of {@link ItemsGrid}: the core options plus how to render. */
 export interface ItemsGridProps<T> extends ItemsGridOptions<T> {
-  /** Renders one card. `index` is the item's position in the dataset. */
+  /**
+   * Renders one card (also the hidden measuring probe, with index `0`). `index` is
+   * `range.start` + the card's offset on the page.
+   */
   renderItem: (item: T, index: number) => ReactNode;
   /** Renders one skeleton card; rendered once per slot while `loading`. */
   renderSkeleton?: (slot: number) => ReactNode;
@@ -62,7 +66,7 @@ export interface ItemsGridProps<T> extends ItemsGridOptions<T> {
 
 function ItemsGridInner<T>(
   props: ItemsGridProps<T>,
-  ref: ForwardedRef<ItemsGridController<T>>
+  ref: ForwardedRef<ItemsGridHandle<T>>
 ): ReactElement {
   const {
     renderItem,
@@ -79,7 +83,7 @@ function ItemsGridInner<T>(
   useImperativeHandle(ref, () => controller, [controller]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (controller.handleKeydown(event.key)) {
+    if (!isEditableTarget(event.target) && controller.handleKeydown(event.key)) {
       event.preventDefault();
     }
   };
@@ -93,7 +97,8 @@ function ItemsGridInner<T>(
       <div
         ref={viewportRef}
         className={CLASSES.viewport}
-        role="list"
+        // The empty state is not a list item, so the viewport is only a list while it has cards.
+        role={state.isEmpty ? undefined : 'list'}
         aria-label={ariaLabel}
         aria-busy={state.loading || undefined}
         style={toReactStyle(getViewportStyle(state))}
@@ -101,7 +106,12 @@ function ItemsGridInner<T>(
       >
         {showSkeletons
           ? Array.from({ length: state.skeletonCount }, (_, slot) => (
-              <div key={slot} className={CLASSES.skeleton} style={CELL_STYLE} aria-hidden="true">
+              <div
+                key={slot}
+                className={`${CLASSES.cell} ${CLASSES.skeleton}`}
+                style={CELL_STYLE}
+                aria-hidden="true"
+              >
                 {renderSkeleton(slot)}
               </div>
             ))
@@ -134,11 +144,7 @@ function ItemsGridInner<T>(
       {typeof pager === 'function' ? (
         pager({ state, controller })
       ) : pager ? (
-        <ItemsGridPager
-          controller={controller as ItemsGridController<unknown>}
-          state={state}
-          labels={pagerLabels}
-        />
+        <ItemsGridPager controller={controller} state={state} labels={pagerLabels} />
       ) : null}
       <div className={CLASSES.live} style={LIVE_STYLE} aria-live="polite">
         {state.announcement}
@@ -152,8 +158,8 @@ function ItemsGridInner<T>(
  * columns as fit, and the rest of the items move to other pages. Give the element a
  * definite height from your layout (e.g. `flex: 1` or `height: 100%`).
  *
- * The `ref` receives the core controller for imperative navigation.
+ * The `ref` receives an {@link ItemsGridHandle} for imperative navigation and state.
  */
 export const ItemsGrid = forwardRef(ItemsGridInner) as <T>(
-  props: ItemsGridProps<T> & { ref?: Ref<ItemsGridController<T>> }
+  props: ItemsGridProps<T> & { ref?: Ref<ItemsGridHandle<T>> }
 ) => ReactElement;

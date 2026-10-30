@@ -32,7 +32,7 @@ export {
   type DefaultPresetName,
 } from './engine/presets';
 export type { GridGeometry, ItemKey, ItemRange, SizePreset, ViewportSize } from './engine/types';
-export { DEFAULT_PAGER_LABELS, type PagerLabels } from './pager';
+export { DEFAULT_PAGER_LABELS, type PagerLabels, resolvePagerLabels } from './pager';
 export { isEditableTarget } from './dom/keyboard';
 export { observeSize, type ObserveSizeOptions } from './dom/observe';
 export {

@@ -29,3 +29,12 @@ export const DEFAULT_PAGER_LABELS: Readonly<PagerLabels> = Object.freeze({
     return totalKnown ? `${shown} of ${total}` : shown;
   },
 });
+
+/** The pager texts: `overrides` merged over the defaults, ignoring `undefined` values. */
+export function resolvePagerLabels(overrides?: Partial<PagerLabels>): PagerLabels {
+  const labels: Record<string, unknown> = { ...DEFAULT_PAGER_LABELS };
+  for (const [key, value] of Object.entries(overrides ?? {})) {
+    if (value !== undefined) labels[key] = value;
+  }
+  return labels as unknown as PagerLabels;
+}

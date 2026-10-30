@@ -1,22 +1,22 @@
 import {
-  DEFAULT_PAGER_LABELS,
   getPagerItems,
   ITEMS_GRID_CLASSES as CLASSES,
-  type ItemsGridController,
+  type ItemsGridHandle,
   type ItemsGridState,
   type PagerLabels,
+  resolvePagerLabels,
 } from '@quietfoundry/items-grid-core';
 import type { ReactElement } from 'react';
 
 /** Props of {@link ItemsGridPager}. */
 export interface ItemsGridPagerProps {
-  /** The grid's controller (from a ref on `ItemsGrid`, or from `useItemsGrid`). */
-  controller: Pick<ItemsGridController<unknown>, 'goTo' | 'next' | 'prev'>;
+  /** The grid's handle (from a ref on `ItemsGrid`, or from `useItemsGrid`). */
+  readonly controller: Pick<ItemsGridHandle<unknown>, 'goTo' | 'next' | 'prev'>;
   /** The grid's current state. */
-  state: ItemsGridState<unknown>;
+  readonly state: ItemsGridState<unknown>;
   /** Texts, merged over the defaults. */
-  labels?: Partial<PagerLabels>;
-  className?: string;
+  readonly labels?: Partial<PagerLabels>;
+  readonly className?: string;
 }
 
 /**
@@ -29,14 +29,14 @@ export function ItemsGridPager({
   labels,
   className,
 }: ItemsGridPagerProps): ReactElement {
-  const text = { ...DEFAULT_PAGER_LABELS, ...labels };
+  const text = resolvePagerLabels(labels);
   return (
     <nav
       className={className ? `${CLASSES.pager} ${className}` : CLASSES.pager}
       aria-label={text.navigation}
     >
       <span className={CLASSES.pagerStatus}>
-        {state.loading ? '' : text.status(state.range, state.total)}
+        {state.loading ? '' : text.status(state.range, state.total, state.totalKnown)}
       </span>
       <div className={CLASSES.pagerList}>
         <button

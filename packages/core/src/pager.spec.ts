@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_PAGER_LABELS } from './pager';
+import { DEFAULT_PAGER_LABELS, resolvePagerLabels } from './pager';
 
 describe('DEFAULT_PAGER_LABELS', () => {
   it('shows the range and total', () => {
@@ -17,5 +17,13 @@ describe('DEFAULT_PAGER_LABELS', () => {
 
   it('is frozen, so one app cannot change every grid', () => {
     expect(Object.isFrozen(DEFAULT_PAGER_LABELS)).toBe(true);
+  });
+});
+
+describe('resolvePagerLabels', () => {
+  it('merges overrides and ignores explicit undefined', () => {
+    const labels = resolvePagerLabels({ next: 'Weiter', page: undefined });
+    expect(labels.next).toBe('Weiter');
+    expect(labels.page(2)).toBe('Page 3');
   });
 });

@@ -1,6 +1,7 @@
 import {
   DEFAULT_MESSAGES,
   ItemsGridController,
+  type ItemsGridHandle,
   type ItemsGridOptions,
   type ItemsGridState,
   observeSize,
@@ -16,11 +17,14 @@ import {
 
 /** What {@link useItemsGrid} returns. */
 export interface UseItemsGridResult<T> {
-  /** The core controller: navigation (`next()`, `goTo()`…), `refresh()`, state. */
-  readonly controller: ItemsGridController<T>;
+  /** Navigation (`next()`, `goTo()`…), `refresh()` and state; the hook owns the inputs. */
+  readonly controller: ItemsGridHandle<T>;
   /** The current render state; the component re-renders when it changes. */
   readonly state: ItemsGridState<T>;
-  /** Attach to the grid viewport; its size drives the page size. */
+  /**
+   * Attach to the grid viewport on the first render (it is observed once per grid). Apply
+   * `getViewportStyle(state)` to it inline; its height must come from the host.
+   */
   readonly viewportRef: RefObject<HTMLDivElement | null>;
   /** Attach to the hidden probe card when `measureRowHeight` is on. */
   readonly probeRef: RefObject<HTMLDivElement | null>;
@@ -67,6 +71,7 @@ export function useItemsGrid<T>(options: ItemsGridOptions<T>): UseItemsGridResul
     reflow,
     align,
     loading,
+    pageIndex,
     requestDebounceMs,
   } = options;
   useLayoutEffect(() => {
@@ -83,6 +88,7 @@ export function useItemsGrid<T>(options: ItemsGridOptions<T>): UseItemsGridResul
       reflow,
       align,
       loading,
+      pageIndex,
       requestDebounceMs,
     });
   }, [
@@ -99,16 +105,9 @@ export function useItemsGrid<T>(options: ItemsGridOptions<T>): UseItemsGridResul
     reflow,
     align,
     loading,
+    pageIndex,
     requestDebounceMs,
   ]);
-
-  // Uncontrolled with sync: the grid starts at `pageIndex` and navigates when it changes.
-  const { pageIndex } = options;
-  useLayoutEffect(() => {
-    if (pageIndex !== undefined && pageIndex !== controller.getState().pageIndex) {
-      controller.goTo(pageIndex);
-    }
-  }, [controller, pageIndex]);
 
   const state = useSyncExternalStore(
     controller.subscribe,

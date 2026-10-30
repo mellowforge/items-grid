@@ -1,4 +1,4 @@
-import type { ItemsGridController, PageRequest } from '@quietfoundry/items-grid-core';
+import type { ItemsGridHandle, PageRequest } from '@quietfoundry/items-grid-core';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { createRef, type Ref, StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,7 +15,7 @@ const entities = (count: number): Entity[] =>
   Array.from({ length: count }, (_, id) => ({ id, name: `Entity ${id}` }));
 
 // React 19 passes `ref` to function components as a prop; the wrapper forwards it.
-function Grid(props: Partial<ItemsGridProps<Entity>> & { ref?: Ref<ItemsGridController<Entity>> }) {
+function Grid(props: Partial<ItemsGridProps<Entity>> & { ref?: Ref<ItemsGridHandle<Entity>> }) {
   return (
     <div style={{ height: 600 }}>
       <ItemsGrid<Entity>
@@ -29,7 +29,7 @@ function Grid(props: Partial<ItemsGridProps<Entity>> & { ref?: Ref<ItemsGridCont
   );
 }
 
-const viewport = (): HTMLElement => screen.getByRole('list', { name: 'Entities' });
+const viewport = (): HTMLElement => document.querySelector('.qf-items-grid__viewport')!;
 const cards = (): string[] => screen.queryAllByRole('listitem').map(item => item.textContent ?? '');
 
 /** Normal preset: 1318×552 → 4 × 3 = 12 per page; 976×552 → 3 × 3 = 9. */
@@ -124,10 +124,11 @@ describe('ItemsGrid', () => {
     expect(viewport().getAttribute('aria-busy')).toBe('true');
   });
 
-  it('renders the empty template when there are no items', () => {
+  it('renders the empty template, and is not a list while empty', () => {
     render(<Grid items={[]} renderEmpty={() => <p>No entities yet</p>} />);
     layout();
     expect(screen.getByText('No entities yet')).toBeTruthy();
+    expect(viewport().hasAttribute('role')).toBe(false);
   });
 
   it('measures the row height from a hidden probe card', () => {
@@ -142,14 +143,89 @@ describe('ItemsGrid', () => {
     expect(viewport().style.gridAutoRows).toBe('118px');
   });
 
-  it('requests pages in server mode, ignoring new callback identities on re-render', () => {
-    const requests: PageRequest[] = [];
+  it('requests pages in server mode through the latest callback, without re-syncing', () => {
+    const first: PageRequest[] = [];
+    const latest: PageRequest[] = [];
+    const items = entities(12);
     const { rerender } = render(
-      <Grid mode="server" items={[]} onPageRequest={request => requests.push(request)} />
+      <Grid mode="server" items={items} total={30} onPageRequest={request => first.push(request)} />
     );
     layout();
-    rerender(<Grid mode="server" items={[]} onPageRequest={request => requests.push(request)} />);
-    expect(requests).toEqual([{ pageIndex: 0, pageSize: 12 }]);
+    rerender(
+      <Grid
+        mode="server"
+        items={items}
+        total={30}
+        onPageRequest={request => latest.push(request)}
+      />
+    );
+    expect(first).toEqual([{ pageIndex: 0, pageSize: 12 }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    expect(latest).toEqual([{ pageIndex: 1, pageSize: 12 }]);
+    expect(first).toHaveLength(1);
+  });
+
+  it('keeps the first card on screen and reports the page when the preset changes', () => {
+    const onPageChange = vi.fn();
+    const { rerender } = render(<Grid onPageChange={onPageChange} />);
+    layout();
+    fireEvent.click(screen.getByRole('button', { name: 'Page 3' })); // items 24–29
+    rerender(<Grid onPageChange={onPageChange} preset="large" />); // 3 × 2 = 6 per page
+    expect(cards()).toContain('Entity 24');
+    expect(onPageChange).toHaveBeenLastCalledWith(4);
+  });
+
+  it('pages back with PageUp and leaves other keys alone', () => {
+    render(<Grid />);
+    layout();
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    expect(!fireEvent.keyDown(screen.getAllByRole('listitem')[0]!, { key: 'ArrowDown' })).toBe(
+      false
+    );
+    fireEvent.keyDown(screen.getAllByRole('listitem')[0]!, { key: 'PageUp' });
+    expect(cards()[0]).toBe('Entity 0');
+  });
+
+  it('ignores PageDown typed into a field inside a card', () => {
+    render(
+      <Grid
+        renderItem={item => (
+          <article>
+            {item.name}
+            <input aria-label={`Note for ${item.name}`} />
+          </article>
+        )}
+      />
+    );
+    layout();
+    const handled = !fireEvent.keyDown(screen.getByLabelText('Note for Entity 0'), {
+      key: 'PageDown',
+    });
+    expect(handled).toBe(false);
+    expect(cards()[0]).toBe('Entity 0');
+  });
+
+  it('swaps skeletons for cards when loading ends', () => {
+    const { rerender } = render(
+      <Grid
+        mode="server"
+        items={[]}
+        loading
+        renderSkeleton={() => <div data-testid="skeleton" />}
+      />
+    );
+    layout();
+    rerender(
+      <Grid
+        mode="server"
+        items={entities(12)}
+        total={30}
+        renderSkeleton={() => <div data-testid="skeleton" />}
+      />
+    );
+    expect(screen.queryAllByTestId('skeleton')).toHaveLength(0);
+    expect(cards()).toHaveLength(12);
+    expect(viewport().hasAttribute('aria-busy')).toBe(false);
   });
 
   it('starts at the pageIndex prop and follows later changes to it', () => {
@@ -188,7 +264,7 @@ describe('ItemsGrid', () => {
   });
 
   it('exposes the controller through a ref', () => {
-    const ref = createRef<ItemsGridController<Entity>>();
+    const ref = createRef<ItemsGridHandle<Entity>>();
     render(<Grid ref={ref} />);
     layout();
     act(() => ref.current!.goTo(2));
@@ -225,6 +301,23 @@ describe('ItemsGrid', () => {
         observer => !observer.disconnected && observer.observed.includes(element)
       )
     ).toHaveLength(0);
+  });
+
+  it('keeps exactly one live probe observer in StrictMode', () => {
+    const { container, unmount } = render(
+      <StrictMode>
+        <Grid measureRowHeight />
+      </StrictMode>
+    );
+    layout();
+    const probe = container.querySelector('.qf-items-grid__probe')!;
+    const live = () =>
+      ResizeObserverStub.instances.filter(
+        observer => !observer.disconnected && observer.observed.includes(probe)
+      );
+    expect(live()).toHaveLength(1);
+    unmount();
+    expect(live()).toHaveLength(0);
   });
 
   it('works in StrictMode after the remount (state still updates)', () => {

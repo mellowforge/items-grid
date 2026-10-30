@@ -6,7 +6,7 @@ import {
 } from '../controller';
 import { getPagerItems, type PagerItem } from '../engine/paging';
 import type { ItemKey } from '../engine/types';
-import { DEFAULT_PAGER_LABELS, type PagerLabels } from '../pager';
+import { type PagerLabels, resolvePagerLabels } from '../pager';
 import { isEditableTarget } from './keyboard';
 import { observeSize } from './observe';
 import {
@@ -41,7 +41,7 @@ export interface MountItemsGridOptions<T> extends ItemsGridOptions<T> {
   readonly pager?: boolean;
   /** Accessible name of the card list. */
   readonly ariaLabel?: string;
-  /** Pager texts, merged over {@link DEFAULT_PAGER_LABELS}. */
+  /** Pager texts, merged over the defaults (`DEFAULT_PAGER_LABELS`). */
   readonly pagerLabels?: Partial<PagerLabels>;
 }
 
@@ -239,7 +239,7 @@ export function mountItemsGrid<T>(
       pager = null;
       return;
     }
-    const labels = { ...DEFAULT_PAGER_LABELS, ...options.pagerLabels };
+    const labels = resolvePagerLabels(options.pagerLabels);
     if (!pager) {
       const nav = create('nav', CLASSES.pager);
       const status = create('span', CLASSES.pagerStatus);

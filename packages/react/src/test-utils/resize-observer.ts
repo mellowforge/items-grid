@@ -6,14 +6,16 @@ type Callback = (entries: Partial<ResizeObserverEntry>[]) => void;
 export class ResizeObserverStub {
   static instances: ResizeObserverStub[] = [];
   observed: Element[] = [];
+  options: (ResizeObserverOptions | undefined)[] = [];
   disconnected = false;
 
   constructor(readonly callback: Callback) {
     ResizeObserverStub.instances.push(this);
   }
 
-  observe(element: Element): void {
+  observe(element: Element, options?: ResizeObserverOptions): void {
     this.observed.push(element);
+    this.options.push(options);
   }
 
   disconnect(): void {
@@ -23,13 +25,14 @@ export class ResizeObserverStub {
   fire(width: number, height: number, border?: { inlineSize: number; blockSize: number }): void {
     this.callback([
       {
+        target: this.observed[0]!,
         contentRect: { width, height } as DOMRectReadOnly,
         borderBoxSize: border ? [border] : undefined,
       },
     ]);
   }
 
-  /** The observer watching `element`. */
+  /** The live observer watching `element`. */
   static for(element: Element): ResizeObserverStub {
     const found = ResizeObserverStub.instances.find(
       observer => !observer.disconnected && observer.observed.includes(element)
@@ -39,25 +42,27 @@ export class ResizeObserverStub {
   }
 }
 
-let frames: FrameRequestCallback[] = [];
+const frames = new Map<number, FrameRequestCallback>();
+let nextFrame = 1;
 
 /** Runs every pending `requestAnimationFrame` callback. */
 export function flushFrames(): void {
-  const pending = frames;
-  frames = [];
+  const pending = [...frames.values()];
+  frames.clear();
   pending.forEach(callback => callback(0));
 }
 
 /** Installs the stub and a manual animation-frame queue. Undo with `vi.unstubAllGlobals()`. */
 export function installLayoutStubs(): void {
   ResizeObserverStub.instances = [];
-  frames = [];
+  frames.clear();
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-    frames.push(callback);
-    return frames.length;
+    const id = nextFrame++;
+    frames.set(id, callback);
+    return id;
   });
-  vi.stubGlobal('cancelAnimationFrame', () => {
-    frames = [];
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+    frames.delete(id);
   });
 }
