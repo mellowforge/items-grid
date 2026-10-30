@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "cli": {
+    "packageManager": "pnpm"
+  },
+  "newProjectRoot": "projects",
+  "projects": {
+    "items-grid": {
+      "projectType": "library",
+      "root": "projects/items-grid",
+      "sourceRoot": "projects/items-grid/src",
+      "prefix": "qf",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:ng-packagr",
+          "configurations": {
+            "production": {
+              "tsConfig": "projects/items-grid/tsconfig.lib.prod.json"
+            },
+            "development": {
+              "tsConfig": "projects/items-grid/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/items-grid/tsconfig.spec.json"
+          }
+        }
+      }
+    }
+  }
+}

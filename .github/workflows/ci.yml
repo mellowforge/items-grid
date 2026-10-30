@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Format, build, lint, test, package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # pnpm version comes from "packageManager" in package.json.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Build packages and apps
+        run: pnpm build
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type-check
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: LICENSE parity
+        # npm only packs files inside the package, so each package carries a copy of the root LICENSE.
+        run: |
+          for copy in packages/core/LICENSE packages/react/LICENSE packages/angular/projects/items-grid/LICENSE; do
+            cmp LICENSE "$copy" || { echo "::error file=$copy::$copy differs from the root LICENSE"; exit 1; }
+          done
+
+      - name: Inspect package contents
+        run: pnpm pack:check

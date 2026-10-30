@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@quietfoundry/items-grid-core": ["../../packages/core/src/index.ts"],
+      "@quietfoundry/items-grid-react": ["../../packages/react/src/index.ts"],
+      "demo-shared": ["../demo-shared/src/index.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

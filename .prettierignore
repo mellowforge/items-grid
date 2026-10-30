@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+.angular/
+.serena/
+pnpm-lock.yaml
+CHANGELOG.md
+_site/
+*.tgz

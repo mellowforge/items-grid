@@ -1,0 +1,43 @@
+{
+  "name": "@quietfoundry/items-grid-angular",
+  "version": "0.0.0",
+  "description": "Angular component over @quietfoundry/items-grid-core: a card grid that fits the screen exactly, with size presets, fixed or measured row height, client or server paging, live or stable realtime reflow, skeletons and an optional pager. Signals, zoneless-ready, no Material or CDK dependency.",
+  "license": "MIT",
+  "author": "Konstantin Penzin",
+  "homepage": "https://github.com/quietfoundry/items-grid#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quietfoundry/items-grid.git",
+    "directory": "packages/angular/projects/items-grid"
+  },
+  "bugs": {
+    "url": "https://github.com/quietfoundry/items-grid/issues"
+  },
+  "keywords": [
+    "angular",
+    "grid",
+    "cards",
+    "pagination",
+    "layout",
+    "responsive",
+    "css-grid",
+    "signals"
+  ],
+  "scripts": {
+    "build": "pnpm --dir ../.. exec ng build items-grid"
+  },
+  "peerDependencies": {
+    "@angular/common": ">=22.0.0",
+    "@angular/core": ">=22.0.0",
+    "@quietfoundry/items-grid-core": "workspace:0.x"
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "directory": "../../dist/items-grid",
+    "linkDirectory": false
+  }
+}

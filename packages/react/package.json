@@ -1,0 +1,80 @@
+{
+  "name": "@quietfoundry/items-grid-react",
+  "version": "0.0.0",
+  "description": "React component over @quietfoundry/items-grid-core: a card grid that fits the screen exactly, with size presets, fixed or measured row height, client or server paging, live or stable realtime reflow, skeletons and an optional pager.",
+  "license": "MIT",
+  "author": "Konstantin Penzin",
+  "homepage": "https://github.com/quietfoundry/items-grid#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quietfoundry/items-grid.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/quietfoundry/items-grid/issues"
+  },
+  "keywords": [
+    "react",
+    "grid",
+    "cards",
+    "pagination",
+    "layout",
+    "responsive",
+    "css-grid"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@quietfoundry/items-grid-core": "workspace:0.x",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@quietfoundry/items-grid-core": "workspace:*",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.0",
+    "jsdom": "^30.1.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^5.0.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

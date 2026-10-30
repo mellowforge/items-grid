@@ -1,0 +1,80 @@
+/*
+ * @quietfoundry/items-grid — optional theme.
+ *
+ * Layout never depends on this file: the grid applies its track layout inline. Import it
+ * for a minimal pager look, or skip it and style the `qf-items-grid*` class hooks yourself.
+ * Theme through the --qf-items-grid-* custom properties.
+ */
+
+.qf-items-grid {
+  --qf-items-grid-pager-gap: 6px;
+  --qf-items-grid-pager-margin: 16px;
+  --qf-items-grid-pager-button-size: 32px;
+  --qf-items-grid-pager-radius: 6px;
+  --qf-items-grid-pager-font: inherit;
+  --qf-items-grid-pager-color: inherit;
+  --qf-items-grid-pager-muted: color-mix(in srgb, currentColor 60%, transparent);
+  --qf-items-grid-pager-border: color-mix(in srgb, currentColor 18%, transparent);
+  --qf-items-grid-pager-background: transparent;
+  --qf-items-grid-pager-current-color: #4f46e5;
+  --qf-items-grid-pager-current-background: color-mix(in srgb, #4f46e5 10%, transparent);
+  --qf-items-grid-focus-ring: #4f46e5;
+}
+
+.qf-items-grid-pager {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--qf-items-grid-pager-gap);
+  margin-top: var(--qf-items-grid-pager-margin);
+  font: var(--qf-items-grid-pager-font);
+  color: var(--qf-items-grid-pager-color);
+}
+
+.qf-items-grid-pager__status {
+  color: var(--qf-items-grid-pager-muted);
+  font-size: 0.8125rem;
+}
+
+.qf-items-grid-pager__list {
+  display: flex;
+  align-items: center;
+  gap: var(--qf-items-grid-pager-gap);
+}
+
+.qf-items-grid-pager__button {
+  min-width: var(--qf-items-grid-pager-button-size);
+  height: var(--qf-items-grid-pager-button-size);
+  padding: 0 10px;
+  border: 1px solid var(--qf-items-grid-pager-border);
+  border-radius: var(--qf-items-grid-pager-radius);
+  background: var(--qf-items-grid-pager-background);
+  color: inherit;
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.qf-items-grid-pager__button[aria-current='page'] {
+  border-color: var(--qf-items-grid-pager-current-color);
+  background: var(--qf-items-grid-pager-current-background);
+  color: var(--qf-items-grid-pager-current-color);
+  font-weight: 600;
+}
+
+.qf-items-grid-pager__button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.qf-items-grid-pager__button:focus-visible,
+.qf-items-grid__cell:focus-visible {
+  outline: 2px solid var(--qf-items-grid-focus-ring);
+  outline-offset: 2px;
+}
+
+.qf-items-grid-pager__gap {
+  color: var(--qf-items-grid-pager-muted);
+  padding: 0 2px;
+}

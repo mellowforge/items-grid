@@ -1,0 +1,28 @@
+# Dependencies & build output
+node_modules/
+dist/
+_site/
+coverage/
+.angular/
+.vite/
+*.tsbuildinfo
+*.tgz
+
+# Logs & system files
+*.log
+.DS_Store
+Thumbs.db
+
+# Editors — share only the recommended extensions and MCP config
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/mcp.json
+
+# Agent tooling
+.serena/
+.claude/plans/
+.claude/settings.local.json
+CLAUDE.local.md
+/docs/superpowers/
+/.superpowers/

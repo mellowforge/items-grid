@@ -1,0 +1,311 @@
+import { NgTemplateOutlet } from '@angular/common';
+import {
+  Component,
+  computed,
+  contentChild,
+  DestroyRef,
+  effect,
+  ElementRef,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
+import {
+  DEFAULT_MESSAGES,
+  getCellStyle,
+  getEmptyStyle,
+  getHostStyle,
+  getProbeStyle,
+  getViewportStyle,
+  getVisuallyHiddenStyle,
+  type GridAlign,
+  type ItemKey,
+  ItemsGridController,
+  type ItemsGridMessages,
+  type ItemsGridState,
+  observeSize,
+  type PageRequest,
+  type PagerLabels,
+  type PagingMode,
+  type ReflowMode,
+  type SizePreset,
+} from '@quietfoundry/items-grid-core';
+
+import { QfItemsGridPager } from './items-grid-pager';
+import { QfItemsGridEmpty, QfItemsGridItem, QfItemsGridSkeleton } from './items-grid-templates';
+
+/**
+ * A card grid that fits its host exactly: the page holds as many full rows and columns as
+ * fit, and the rest of the items move to other pages. Give the host a definite height from
+ * your layout (e.g. `flex: 1` or `height: 100%`).
+ *
+ * ```html
+ * <qf-items-grid [items]="devices()" [getKey]="byId" preset="compact">
+ *   <ng-template qfItemsGridItem let-device><app-device-card [device]="device" /></ng-template>
+ * </qf-items-grid>
+ * ```
+ */
+@Component({
+  selector: 'qf-items-grid',
+  exportAs: 'qfItemsGrid',
+  imports: [NgTemplateOutlet, QfItemsGridPager],
+  host: { class: 'qf-items-grid', '[style]': 'hostStyle' },
+  template: `
+    <div
+      #viewport
+      class="qf-items-grid__viewport"
+      role="list"
+      [attr.aria-label]="ariaLabel() ?? null"
+      [attr.aria-busy]="state().loading ? 'true' : null"
+      [style]="viewportStyle()"
+      (keydown)="onKeydown($event)"
+    >
+      @if (state().loading && skeletonDef(); as skeleton) {
+        @for (slot of skeletonSlots(); track slot) {
+          <div
+            class="qf-items-grid__cell qf-items-grid__cell--skeleton"
+            [style]="cellStyle"
+            aria-hidden="true"
+          >
+            <ng-container
+              [ngTemplateOutlet]="skeleton.template"
+              [ngTemplateOutletContext]="{ $implicit: slot, slot }"
+            />
+          </div>
+        }
+      } @else {
+        @for (item of state().items; track trackKey(item); let offset = $index) {
+          <div class="qf-items-grid__cell" [style]="cellStyle" role="listitem">
+            <ng-container
+              [ngTemplateOutlet]="itemDef()?.template ?? null"
+              [ngTemplateOutletContext]="{
+                $implicit: item,
+                item,
+                index: state().range.start + offset,
+              }"
+            />
+          </div>
+        }
+      }
+      @if (state().isEmpty && emptyDef(); as empty) {
+        <div class="qf-items-grid__empty" [style]="emptyStyle">
+          <ng-container [ngTemplateOutlet]="empty.template" />
+        </div>
+      }
+      @if (probeItem(); as probe) {
+        <div
+          #probe
+          class="qf-items-grid__cell qf-items-grid__probe"
+          [style]="probeStyle()"
+          aria-hidden="true"
+        >
+          <ng-container
+            [ngTemplateOutlet]="itemDef()?.template ?? null"
+            [ngTemplateOutletContext]="{ $implicit: probe.item, item: probe.item, index: 0 }"
+          />
+        </div>
+      }
+    </div>
+    @if (pager()) {
+      <qf-items-grid-pager [controller]="controller" [state]="state()" [labels]="pagerLabels()" />
+    }
+    <div class="qf-items-grid__live" [style]="liveStyle" aria-live="polite">
+      {{ state().announcement }}
+    </div>
+  `,
+})
+export class QfItemsGrid<T> {
+  // MARK: - Inputs
+
+  /** Client mode: the whole dataset. Server mode: the current page. */
+  readonly items = input<readonly T[]>([]);
+
+  /** Stable identity of an item; must not depend on its position. */
+  readonly getKey = input.required<(item: T) => ItemKey>();
+
+  /** `'client'` (default) slices `items`; `'server'` requests pages via `pageRequest`. */
+  readonly mode = input<PagingMode>('client');
+
+  /** Server mode: size of the whole dataset; unknown while `undefined`. */
+  readonly total = input<number | undefined>(undefined);
+
+  /** Name of the active preset. Default `'normal'`. */
+  readonly preset = input<string | undefined>(undefined);
+
+  /** Available presets. Default: compact, normal, large. */
+  readonly presets = input<Readonly<Record<string, SizePreset>> | undefined>(undefined);
+
+  /** Measure the row height from a hidden sample card instead of using the preset's. */
+  readonly measureRowHeight = input(false);
+
+  /** The item rendered in the measuring probe; defaults to the first item. */
+  readonly sampleItem = input<T | undefined>(undefined);
+
+  /** Overrides the preset's `maxColumns`. */
+  readonly maxColumns = input<number | undefined>(undefined);
+
+  /** Overrides the preset's `maxPageSize`. */
+  readonly maxPageSize = input<number | undefined>(undefined);
+
+  /** `'live'` (default) or `'stable'` (freeze the page; count new items). */
+  readonly reflow = input<ReflowMode>('live');
+
+  /** `'start'` (default, leftover height below the rows) or `'center'`. */
+  readonly align = input<GridAlign>('start');
+
+  /** The app is fetching data: render the skeleton template once per slot. */
+  readonly loading = input(false);
+
+  /**
+   * Zero-based page to show. The grid navigates when it changes and reports its own
+   * changes through `pageIndexChange`, so `[(pageIndex)]` binds two-way.
+   */
+  readonly pageIndex = input(0);
+
+  /** Server mode: delay before requesting a page after a resize, in ms. Default 150. */
+  readonly requestDebounceMs = input<number | undefined>(undefined);
+
+  /** Screen-reader announcements, merged over the English defaults. */
+  readonly messages = input<Partial<ItemsGridMessages> | undefined>(undefined);
+
+  /** Render the built-in pager below the grid. Default `true`. */
+  readonly pager = input(true);
+
+  /** Texts of the built-in pager. */
+  readonly pagerLabels = input<Partial<PagerLabels> | undefined>(undefined);
+
+  /** Accessible name of the card list. */
+  readonly ariaLabel = input<string | undefined>(undefined);
+
+  // MARK: - Outputs
+
+  /** Server mode: the grid needs this page. Respond by updating `items` and `total`. */
+  readonly pageRequest = output<PageRequest>();
+
+  /** The page index changed: navigation, reanchoring after a resize, or clamping. */
+  readonly pageIndexChange = output<number>();
+
+  /**
+   * Every new render state, for app chrome outside the grid (e.g. a "5 new items" banner
+   * from `pendingCount`). Inside a template, `#grid="qfItemsGrid"` + `grid.state()` also works.
+   */
+  readonly stateChange = output<ItemsGridState<T>>();
+
+  // MARK: - Templates & view
+
+  protected readonly itemDef = contentChild(QfItemsGridItem<T>);
+  protected readonly skeletonDef = contentChild(QfItemsGridSkeleton);
+  protected readonly emptyDef = contentChild(QfItemsGridEmpty);
+
+  private readonly _viewport = viewChild.required<ElementRef<HTMLElement>>('viewport');
+  private readonly _probe = viewChild<ElementRef<HTMLElement>>('probe');
+
+  // MARK: - State
+
+  /** The core controller, for imperative navigation (`next()`, `goTo()`, `refresh()`). */
+  readonly controller: ItemsGridController<T>;
+
+  /**
+   * Monotonic version bumped by every controller notification; `state` reads it to
+   * re-derive from the plain, non-reactive controller.
+   */
+  private readonly _version = signal(0);
+
+  /** The current render state. */
+  readonly state = computed<ItemsGridState<T>>(() => {
+    this._version();
+    return this.controller.getState();
+  });
+
+  protected readonly hostStyle = getHostStyle();
+  protected readonly cellStyle = getCellStyle();
+  protected readonly emptyStyle = getEmptyStyle();
+  protected readonly liveStyle = getVisuallyHiddenStyle();
+  protected readonly viewportStyle = computed(() => getViewportStyle(this.state()));
+  protected readonly probeStyle = computed(() => getProbeStyle(this.state()));
+  protected readonly skeletonSlots = computed(() =>
+    Array.from({ length: this.state().skeletonCount }, (_, slot) => slot),
+  );
+  /** Wrapped so `@if` also renders a falsy probe item (e.g. `0`). */
+  protected readonly probeItem = computed(() => {
+    const item = this.state().probeItem;
+    return item === undefined ? null : { item };
+  });
+
+  constructor() {
+    // Callbacks read the latest inputs untracked, so option changes never rebuild anything.
+    this.controller = new ItemsGridController<T>({
+      getKey: (item) => untracked(this.getKey)(item),
+      onPageRequest: (request) => this.pageRequest.emit(request),
+      onPageChange: (pageIndex) => this.pageIndexChange.emit(pageIndex),
+      onStateChange: (state) => this.stateChange.emit(state),
+      messages: {
+        page: (info) => (untracked(this.messages)?.page ?? DEFAULT_MESSAGES.page)(info),
+        newItems: (count) =>
+          (untracked(this.messages)?.newItems ?? DEFAULT_MESSAGES.newItems)(count),
+      },
+    });
+    const unsubscribe = this.controller.subscribe(() => this._version.update((v) => v + 1));
+
+    // Every scalar input flows through one effect; the controller ignores unchanged values.
+    effect(() => {
+      const options = {
+        items: this.items(),
+        mode: this.mode(),
+        total: this.total(),
+        preset: this.preset(),
+        presets: this.presets(),
+        measureRowHeight: this.measureRowHeight(),
+        sampleItem: this.sampleItem(),
+        maxColumns: this.maxColumns(),
+        maxPageSize: this.maxPageSize(),
+        reflow: this.reflow(),
+        align: this.align(),
+        loading: this.loading(),
+        requestDebounceMs: this.requestDebounceMs(),
+      };
+      untracked(() => this.controller.setOptions(options));
+    });
+
+    effect(() => {
+      const pageIndex = this.pageIndex();
+      untracked(() => {
+        if (pageIndex !== this.controller.getState().pageIndex) this.controller.goTo(pageIndex);
+      });
+    });
+
+    effect((onCleanup) => {
+      const viewport = this._viewport().nativeElement;
+      onCleanup(observeSize(viewport, (size) => this.controller.setViewportSize(size)));
+    });
+
+    effect((onCleanup) => {
+      const probe = this._probe()?.nativeElement;
+      if (probe) {
+        onCleanup(
+          observeSize(probe, (size) => this.controller.setMeasuredRowHeight(size.height), {
+            box: 'border',
+          }),
+        );
+      }
+    });
+
+    inject(DestroyRef).onDestroy(() => {
+      unsubscribe();
+      this.controller.destroy();
+    });
+  }
+
+  protected trackKey(item: T): ItemKey {
+    return this.getKey()(item);
+  }
+
+  protected onKeydown(event: KeyboardEvent): void {
+    if (this.controller.handleKeydown(event.key)) {
+      event.preventDefault();
+    }
+  }
+}
