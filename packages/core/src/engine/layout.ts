@@ -16,7 +16,8 @@ const isPositive = (value: number): boolean => Number.isFinite(value) && value >
  * Computes how many cards fit the viewport.
  *
  * Columns: as many `minCardWidth` tracks as fit with gaps between them. Rows: as many
- * full rows as fit, so a partial row is never shown. Both are at least 1.
+ * full rows as fit. Both are at least 1, so one (clipped) row shows even in a viewport
+ * shorter than a row.
  *
  * @returns `null` while the viewport has not been measured (zero, negative or non-finite
  * size), so callers can tell "not laid out yet" apart from a real page size.

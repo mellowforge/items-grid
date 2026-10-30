@@ -26,7 +26,7 @@ It moves the code every dashboard keeps re-implementing into one place:
 ```text
 cols     = max(1, floor((width  + gap) / (minCardWidth + gap)))
 rows     = max(1, floor((height + gap) / (rowHeight    + gap)))
-pageSize = cols × rows            (capped by maxColumns / maxPageSize: rows first, then columns)
+pageSize = cols × rows            (cols capped by maxColumns; maxPageSize trims rows, then cols)
 ```
 
 The grid measures only its own viewport, so the host needs a **definite height** from your

@@ -60,13 +60,16 @@ grid.destroy();
 
 ## Options (`ItemsGridOptions<T>`)
 
-Invalid values (an unknown preset or one with non-positive sizes, a NaN `pageIndex`, a
-negative `total`, `maxColumns` below 1, …) throw an `items-grid:` error naming the field, and
-the previous options stay in place.
+Invalid values throw an `items-grid:` error naming the field, and the previous options stay
+in place (for `mountItemsGrid().update()` too). Checked: `getKey`, `items` (an array),
+`mode`, `reflow`, `align`, `total`, `pageIndex` (a number ≥ 0; fractions are floored),
+`maxColumns`, `maxPageSize`, `requestDebounceMs`, `messages` and the preset values. In the
+adapters the error surfaces where they push options: an error boundary in React, Angular's
+`ErrorHandler`.
 
 | Option              | Default    | Description                                                                                                                                                                         |
 | ------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `getKey`            | —          | **Required.** Stable, unique identity of an item; must not depend on its position. Duplicates are warned about once.                                                                |
+| `getKey`            | —          | **Required.** Stable, unique identity of an item (also as a string); must not depend on its position. Duplicates on the visible page are warned about once per key.                 |
 | `items`             | `[]`       | Client mode: the whole dataset. Server mode: the current page. Compared by identity — replace it to update.                                                                         |
 | `mode`              | `'client'` | `'client'` slices `items`; `'server'` asks for pages through `onPageRequest`.                                                                                                       |
 | `total`             | —          | Server mode: dataset size. `undefined` / `null` means unknown: the page is never clamped, `canNext` is true while pages come back full, and `state.totalKnown` is false.            |
@@ -106,8 +109,11 @@ so far), `pageSize`, `total`, `totalKnown`, `range` (`{ start, end }`, where `st
 
 The app owns the data: on `onPageRequest({ pageIndex, pageSize })`, set `loading`, fetch,
 then pass the page as `items` and the dataset size as `total` (or leave `total` unknown).
-Guard against out-of-order responses, and retry a failed page with `refresh()` —
-navigating to the same page again does not re-request it.
+Guard against out-of-order responses. On a failed fetch, clear `loading` and the page's
+`items` (so the previous page never shows under the new page's numbers), and retry with
+`refresh()` — navigating to the same page again does not re-request it. With a known total,
+`range` follows `total`, not the length of `items`; while the total is unknown, emptiness is
+only reported once you pass `total: 0`.
 
 ## Realtime
 
@@ -132,17 +138,20 @@ works. It touches no DOM. Apps get only the `ItemsGridHandle` from the adapters 
 `mountItemsGrid().controller`).
 
 Helpers for adapters: `observeSize` (ResizeObserver, one report per animation frame; warns
-once where ResizeObserver is missing, e.g. jsdom tests), `getViewportStyle` and friends (the
-inline layout styles), `isEditableTarget`, `ITEMS_GRID_CLASSES`, `getPagerItems`,
-`resolvePagerLabels`, `DEFAULT_PAGER_LABELS`.
+once per page load where ResizeObserver is missing, e.g. jsdom tests), `getViewportStyle` and
+friends (the inline layout styles), `shouldPageGrid` and `isEditableTarget`,
+`ITEMS_GRID_CLASSES`, `getPagerItems`, `resolvePagerLabels`, `DEFAULT_PAGER_LABELS`.
+
+After `destroy()`, the vanilla mount's handle is inert and `update()` throws.
 
 ## Accessibility
 
 The viewport is a `role="list"` of `role="listitem"` cells (no list role while it shows the
 empty state), `aria-busy` while loading. A polite live region announces "Page 3 of 10, items
 25–36 of 120" after the page changes and "5 new items" in stable mode. PageUp / PageDown page
-while focus is inside a card, except in text fields. The pager uses real buttons with labels
-and `aria-current="page"`.
+while focus is inside a card, except in text fields, selects and contenteditable regions
+(also inside shadow roots), and except when the card already handled the key. The pager
+uses real buttons with labels and `aria-current="page"`.
 
 ## Styling
 

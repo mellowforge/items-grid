@@ -12,7 +12,8 @@ export interface PagerLabels {
   readonly page: (pageIndex: number) => string;
   /**
    * Visible status next to the buttons. Default "Items 13–24 of 57", "Items 13–24" while
-   * the server total is unknown, or "No items".
+   * the server total is unknown, or "No items" for an empty range. The pagers don't call it
+   * while loading or before the grid is measured; the status is blank then.
    */
   readonly status: (range: ItemRange, total: number, totalKnown: boolean) => string;
 }

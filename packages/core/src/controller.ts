@@ -24,8 +24,10 @@ export type PagingMode = 'client' | 'server';
 
 /**
  * How the current page reacts to data changes. `live`: it always shows the current slice,
- * so cards shift across page boundaries. `stable`: the page keeps its cards until the
- * user navigates, resizes or calls `refresh()`; new items are counted in `pendingCount`.
+ * so cards shift across page boundaries. `stable`: in client mode the page keeps its cards
+ * until navigation, a page-size change (resize, preset) or `refresh()`, and new items are
+ * counted in `pendingCount`; in server mode the app owns the cards, the page only clamps when
+ * it no longer exists, and `pendingCount` is the growth of `total`.
  */
 export type ReflowMode = 'live' | 'stable';
 
@@ -168,7 +170,10 @@ export interface ItemsGridState<T> {
    * `canNext`.
    */
   readonly pageCount: number;
-  /** Dataset size; while the server total is unknown, the items seen so far (`range.end`). */
+  /**
+   * Dataset size. While the server total is unknown: the items seen so far (`range.end`), or
+   * `0` before the grid is measured.
+   */
   readonly total: number;
   /** `false` in server mode while `total` is unknown. */
   readonly totalKnown: boolean;
@@ -179,7 +184,10 @@ export interface ItemsGridState<T> {
   readonly loading: boolean;
   /** Skeleton cards to render while loading; `0` when not loading or not measured. */
   readonly skeletonCount: number;
-  /** No items, a known total and not loading: render the empty state. */
+  /**
+   * Render the empty state: not loading and a known total of `0` (in server mode `total: 0`,
+   * whatever `items` holds).
+   */
   readonly isEmpty: boolean;
   /** `true` in stable mode once the page is frozen (and its total known, in server mode). */
   readonly frozen: boolean;
@@ -489,7 +497,8 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   /**
    * Handles paging keys pressed inside the grid: PageDown and PageUp.
    *
-   * @returns whether the key was handled, so the adapter can `preventDefault()`.
+   * @returns whether it is a paging key (also at the first / last page), so the adapter can
+   * `preventDefault()` the browser's own scrolling.
    */
   readonly handleKeydown = (key: string): boolean => {
     if (key === 'PageDown') {
@@ -519,7 +528,8 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   /**
    * Cancels a pending page request, forgets the last one and drops every listener. The
    * controller stays usable: subscribing again resumes updates (React StrictMode remounts
-   * rely on it), and the next layout requests its page again.
+   * rely on it), and the next layout requests its page again (debounced, unless it is the
+   * first layout).
    */
   destroy(): void {
     this._cancelRequest();

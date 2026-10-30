@@ -16,8 +16,8 @@ export const ITEMS_GRID_CLASSES = Object.freeze({
   cell: 'qf-items-grid__cell',
   /** Modifier added next to `cell` on skeleton slots. */
   skeleton: 'qf-items-grid__cell--skeleton',
-  /** Modifier added next to `cell` on the hidden measuring probe. */
   empty: 'qf-items-grid__empty',
+  /** Added next to `cell` on the hidden measuring probe. */
   probe: 'qf-items-grid__probe',
   live: 'qf-items-grid__live',
   pager: 'qf-items-grid-pager',

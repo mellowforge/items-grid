@@ -47,7 +47,7 @@ export interface ItemsGridProps<T> extends ItemsGridOptions<T> {
   renderItem: (item: T, index: number) => ReactNode;
   /** Renders one skeleton card; rendered once per slot while `loading`. */
   renderSkeleton?: (slot: number) => ReactNode;
-  /** Renders the empty state over the whole viewport when there are no items. */
+  /** Renders the empty state over the whole viewport while `state.isEmpty`. */
   renderEmpty?: () => ReactNode;
   /**
    * `true` (default) renders {@link ItemsGridPager}; `false` renders none; a function

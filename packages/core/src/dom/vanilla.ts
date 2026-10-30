@@ -35,7 +35,7 @@ export interface MountItemsGridOptions<T> extends ItemsGridOptions<T> {
   readonly updateItem?: (element: HTMLElement, item: T, index: number) => void;
   /** Creates one skeleton card; rendered once per slot while `loading`. */
   readonly renderSkeleton?: (slot: number) => HTMLElement;
-  /** Creates the empty state; rendered over the whole viewport when there are no items. */
+  /** Creates the empty state; rendered over the whole viewport while `state.isEmpty`. */
   readonly renderEmpty?: () => HTMLElement;
   /** Render the built-in pager below the grid. Default `true`. */
   readonly pager?: boolean;

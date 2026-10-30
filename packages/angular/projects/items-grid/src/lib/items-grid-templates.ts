@@ -61,7 +61,7 @@ export class QfItemsGridSkeleton {
   }
 }
 
-/** The empty-state template, rendered over the whole viewport when there are no items. */
+/** The empty-state template, rendered over the whole viewport while `state().isEmpty`. */
 @Directive({
   selector: 'ng-template[qfItemsGridEmpty]',
 })

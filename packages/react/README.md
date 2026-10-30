@@ -44,7 +44,7 @@ Additional props:
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `renderItem`         | **Required.** `(item, index) => ReactNode`; `index` is `range.start` + the offset on the page. Cards keep their DOM across updates by `getKey`. |
 | `renderSkeleton`     | `(slot) => ReactNode`, rendered once per slot while `loading`.                                                                                  |
-| `renderEmpty`        | `() => ReactNode`, rendered over the viewport when there are no items.                                                                          |
+| `renderEmpty`        | `() => ReactNode`, rendered over the viewport while `state.isEmpty` (a known total of 0).                                                       |
 | `pager`              | `true` (default), `false`, or `({ state, controller }) => ReactNode` for your own.                                                              |
 | `pagerLabels`        | Localized pager texts.                                                                                                                          |
 | `aria-label`         | Accessible name of the card list.                                                                                                               |
@@ -70,7 +70,9 @@ page change the grid makes (navigation, reanchoring, clamping).
 ```
 
 In `load`, set `loading` synchronously, drop responses that arrive after a newer request,
-and on failure clear `loading` and offer a retry with `grid.current?.refresh()`.
+and on failure clear `loading` and the page's `items` and offer a retry with
+`grid.current?.refresh()`. Invalid options throw during render: wrap the grid in an error
+boundary if they can come from user input.
 
 ### Imperative API and app chrome
 

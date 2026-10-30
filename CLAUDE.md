@@ -31,7 +31,8 @@ apps/demo-react, apps/demo-angular  source-linked mirrors of each other
 - **Identity**: `getKey(item)` takes no index; card DOM is keyed by it in every renderer.
 - **Anchor**: resizes and preset changes reanchor on the index of the first card at the last navigation; the anchor survives the viewport being hidden.
 - **Server mode**: an unknown `total` (`undefined`/`null`) never clamps the page and `canNext` follows full pages; page-size-driven requests are debounced, navigation, `refresh()` and entering server mode are immediate, identical requests are deduplicated, and a mode switch forgets the last request.
-- **Inputs fail loudly**: invalid options throw an `items-grid:` error before being stored; misuse that cannot throw (duplicate keys, a missing Angular item template, no ResizeObserver) warns once.
+- **Inputs fail loudly**: invalid options throw an `items-grid:` error and nothing is stored (`setOptions` and vanilla `update()` are all-or-nothing); misuse that cannot throw warns: duplicate keys once per key per grid, a missing Angular item template once per grid, no ResizeObserver once per page load.
+- **Effects are ordered**: subscribers see a state before its page request and `onPageChange`; a callback that syncs again makes the outer effects stale, and they are skipped. Errors from subscribers and effects are collected, the first rethrown.
 - **Apps get `ItemsGridHandle`**, never the full controller with its setters.
 - **Controller lifecycle**: `destroy()` must stay reversible (React StrictMode re-subscribes). The constructor never reports state through `onStateChange`.
 - **React**: callbacks via a latest-value ref (inline arrows are free — don't add `useCallback`); options are pushed in layout effects, never during render; React 18 and 19 peers, so no React-19-only APIs in the library.

@@ -63,7 +63,9 @@ Optional pager theme — import it once from a global stylesheet:
 `@import '@quietfoundry/items-grid-core/styles.css';`
 
 `[qfItemsGridItemOf]` is only for typing: with `strictTemplates`, `let-device` is then a
-`Device`. Forgetting to import `QfItemsGridItem` renders empty cards and logs a warning.
+`Device`; without it, `let-device` is `any`. A grid without an item template renders empty
+cards and logs a warning (with the binding, a missing `QfItemsGridItem` import is a compile
+error instead).
 
 ## API
 
@@ -71,10 +73,12 @@ Optional pager theme — import it once from a global stylesheet:
 `mode`, `total`, `preset`, `presets`, `measureRowHeight`, `sampleItem`, `maxColumns`,
 `maxPageSize`, `reflow`, `align`, `loading`, `pageIndex`, `requestDebounceMs`, `messages`,
 plus `pager` (default `true`), `pagerLabels` and `ariaLabel`. Invalid values throw an
-`items-grid:` error and keep the previous options.
+`items-grid:` error from the options effect (so they reach Angular's `ErrorHandler`) and the
+previous options stay in place.
 
 **Outputs:** `pageRequest` (server mode: `{ pageIndex, pageSize }` — set `loading` in the
-handler, and retry a failed page with `grid.controller.refresh()`), `pageIndexChange` (every
+handler; on failure clear `loading` and the page's `items`, and retry with
+`grid.controller.refresh()`), `pageIndexChange` (every
 page change the grid makes, so `[(pageIndex)]` binds two-way) and `stateChange` (every new
 state — e.g. for a "5 new items" banner from `pendingCount`).
 

@@ -25,7 +25,7 @@ export interface ViewportSize {
 export interface GridGeometry {
   /** Number of column tracks. Always at least 1. */
   readonly cols: number;
-  /** Number of row tracks that fit fully. Always at least 1. */
+  /** Row tracks that fit fully, but at least 1 (clipped when the viewport is shorter). */
   readonly rows: number;
   /** `cols × rows`, after `maxPageSize` is applied. */
   readonly pageSize: number;
