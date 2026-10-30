@@ -366,6 +366,46 @@ describe('mountItemsGrid', () => {
     expect(texts()[0]).toBe('New Entity 0');
   });
 
+  it('keeps an applied update whose state is unchanged when an effect throws', () => {
+    const grid = mount({ items: entities(12) });
+    layout();
+    const renamed = (item: Entity): HTMLElement => {
+      const card = document.createElement('article');
+      card.textContent = `New ${item.name}`;
+      return card;
+    };
+    expect(() =>
+      grid.update({
+        mode: 'server',
+        total: 12,
+        renderItem: renamed,
+        onPageRequest: () => {
+          throw new Error('offline');
+        },
+      })
+    ).toThrow('offline');
+    expect(texts()[0]).toBe('New Entity 0');
+  });
+
+  it('rethrows the first error when re-rendering after it fails again', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const grid = mount();
+    layout();
+    expect(() =>
+      grid.update({
+        items: entities(29),
+        renderItem: () => {
+          throw new Error('render failed');
+        },
+      })
+    ).toThrow('render failed');
+    expect(errors).toHaveBeenCalledWith(
+      expect.stringContaining('re-rendering after a failed update'),
+      expect.objectContaining({ message: 'render failed' })
+    );
+    errors.mockRestore();
+  });
+
   it('warns once when the handle is used after destroy', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const grid = mount();

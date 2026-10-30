@@ -1065,3 +1065,101 @@ describe('ItemsGridController — round 3 (re-entrancy)', () => {
     expect(controller.getState().pendingCount).toBe(20);
   });
 });
+
+describe('ItemsGridController — round 4 (effects re-entered from callbacks)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  const server = (options: Partial<ItemsGridOptions<Entity>> = {}) =>
+    setup({ mode: 'server', items: entities(12), total: 120, ...options });
+
+  it('reports only the final page when onPageRequest navigates', () => {
+    const pages: number[] = [];
+    const controller: ItemsGridController<Entity> = server({
+      onPageChange: page => pages.push(page),
+      onPageRequest: request => {
+        if (request.pageIndex === 2) controller.goTo(3);
+      },
+    });
+    controller.goTo(2);
+    expect(controller.getState().pageIndex).toBe(3);
+    expect(pages.at(-1)).toBe(3);
+    controller.setOptions({ align: 'center' });
+    expect(pages.at(-1)).toBe(3);
+  });
+
+  it('never reports a page that onPageRequest left before it was reported', () => {
+    const pages: number[] = [];
+    const controller: ItemsGridController<Entity> = server({
+      onPageChange: page => pages.push(page),
+      onPageRequest: request => {
+        if (request.pageIndex === 9) controller.setOptions({ mode: 'client', items: entities(10) });
+      },
+    });
+    controller.goTo(9);
+    // Page 9 was left before its report went out; the grid ends where it started.
+    expect(controller.getState().pageIndex).toBe(0);
+    expect(pages).toEqual([]);
+  });
+
+  it('throws an onPageChange error from the navigating call, not from onPageRequest', () => {
+    let fetched = false;
+    const controller: ItemsGridController<Entity> = server({
+      onPageRequest: request => {
+        if (request.pageIndex === 0) return; // the first layout, during setup
+        controller.setOptions({ loading: true });
+        fetched = true;
+      },
+      onPageChange: () => {
+        throw new Error('page sync failed');
+      },
+    });
+    expect(() => controller.goTo(2)).toThrow('page sync failed');
+    expect(fetched).toBe(true);
+  });
+
+  it('retries a page whose onPageRequest threw', () => {
+    let fail = false;
+    const requests: number[] = [];
+    const controller = server({
+      onPageRequest: request => {
+        requests.push(request.pageIndex);
+        if (fail) throw new Error('offline');
+      },
+    });
+    fail = true;
+    expect(() => controller.goTo(2)).toThrow('offline');
+    fail = false;
+    controller.goTo(2);
+    expect(requests.filter(page => page === 2)).toHaveLength(2);
+  });
+
+  it('logs a debounced onPageRequest error with context instead of throwing from a timer', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const controller = server({
+      onPageRequest: request => {
+        if (request.pageSize === 9) throw new Error('offline');
+      },
+    });
+    controller.setViewportSize(NARROW);
+    expect(() => vi.advanceTimersByTime(500)).not.toThrow();
+    expect(errors).toHaveBeenCalledWith(
+      expect.stringContaining('items-grid: onPageRequest threw'),
+      expect.objectContaining({ message: 'offline' })
+    );
+    errors.mockRestore();
+  });
+
+  it('stops notifying once a subscriber destroys the grid', () => {
+    const later = vi.fn();
+    const onStateChange = vi.fn();
+    const controller = setup({ onStateChange });
+    onStateChange.mockClear();
+    controller.subscribe(() => controller.destroy());
+    controller.subscribe(later);
+    controller.next();
+    expect(later).not.toHaveBeenCalled();
+    expect(onStateChange).not.toHaveBeenCalled();
+  });
+});

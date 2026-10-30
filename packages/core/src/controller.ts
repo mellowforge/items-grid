@@ -313,6 +313,18 @@ const freezeState = <T>(state: ItemsGridState<T>): ItemsGridState<T> => {
   return Object.freeze(state);
 };
 
+/**
+ * How many times each controller has accepted new options. Module-private: the vanilla mount
+ * reads it (via {@link getOptionsRevision}) to tell a rejected `setOptions` from one that was
+ * applied but whose app callbacks then threw.
+ */
+const optionsRevisions = new WeakMap<object, number>();
+
+/** @internal Number of `setOptions` calls `controller` has accepted. */
+export function getOptionsRevision(controller: object): number {
+  return optionsRevisions.get(controller) ?? 0;
+}
+
 /** An error from app code called during a sync, and where it came from. */
 interface Caught {
   readonly source: string;
@@ -374,6 +386,8 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   private _depth = 0;
   /** The page request the syncs since the last effects run asked for, if any. */
   private _owedRequest: OwedRequest | null = null;
+  /** Bumped by `destroy()`, so a notification loop stops once a subscriber destroys the grid. */
+  private _epoch = 0;
   /** The page index last reported through `onPageChange` (or the initial one). */
   private _reportedPageIndex: number;
 
@@ -449,6 +463,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
       this._anchorIndex = saved.anchorIndex;
       throw error;
     }
+    optionsRevisions.set(this, getOptionsRevision(this) + 1);
     rethrow(failure);
   }
 
@@ -554,6 +569,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     // Nothing owed survives: a sync that a subscriber destroyed runs no effects.
     this._owedRequest = null;
     this._reportedPageIndex = this._state.pageIndex;
+    this._epoch++;
     this._listeners.clear();
   }
 
@@ -806,38 +822,55 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     try {
       if (!sameState(this._state, next)) {
         this._state = next;
-        for (const listener of [...this._listeners]) attempt('a subscriber', listener);
-        if (this._ready) attempt('onStateChange', () => this._options.onStateChange?.(next));
+        const epoch = this._epoch;
+        for (const listener of [...this._listeners]) {
+          if (epoch !== this._epoch) break; // destroyed by an earlier subscriber
+          attempt('a subscriber', listener);
+        }
+        if (this._ready && epoch === this._epoch) {
+          attempt('onStateChange', () => this._options.onStateChange?.(next));
+        }
+      }
+      if (this._depth === 1) {
+        this._runEffects(attempt);
       }
     } finally {
       this._depth--;
     }
-    if (this._depth === 0) {
-      this._runEffects(attempt);
-    }
     return errors.length ? { errors } : null;
   }
 
+  /**
+   * Delivers what the syncs owe, from the current state, until nothing is owed: callbacks
+   * may sync again (e.g. `onPageRequest` navigating or switching mode), and while effects run
+   * the depth stays raised, so those nested syncs leave their effects to this loop — which
+   * keeps request-before-report order, reports only the final page, and returns every error
+   * to the call that started it.
+   */
   private _runEffects(attempt: (source: string, run: () => void) => void): void {
-    const owed = this._owedRequest;
-    this._owedRequest = null;
-    const state = this._state;
-    if (owed) {
-      if (this._options.mode === 'server' && state.geometry) {
-        attempt('onPageRequest', () =>
-          this._request(
-            { pageIndex: state.pageIndex, pageSize: state.pageSize },
-            owed.immediate,
-            owed.force
-          )
-        );
-      } else {
-        this._cancelRequest();
+    const unreported = (): boolean =>
+      this._ready && this._state.pageIndex !== this._reportedPageIndex;
+    while (this._owedRequest || unreported()) {
+      const owed = this._owedRequest;
+      if (owed) {
+        this._owedRequest = null;
+        const state = this._state;
+        if (this._options.mode === 'server' && state.geometry) {
+          attempt('onPageRequest', () =>
+            this._request(
+              { pageIndex: state.pageIndex, pageSize: state.pageSize },
+              owed.immediate,
+              owed.force
+            )
+          );
+        } else {
+          this._cancelRequest();
+        }
+        continue;
       }
-    }
-    if (this._ready && state.pageIndex !== this._reportedPageIndex) {
-      this._reportedPageIndex = state.pageIndex;
-      attempt('onPageChange', () => this._options.onPageChange?.(state.pageIndex));
+      const pageIndex = this._state.pageIndex;
+      this._reportedPageIndex = pageIndex;
+      attempt('onPageChange', () => this._options.onPageChange?.(pageIndex));
     }
   }
 
@@ -878,22 +911,38 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     this._cancelRequest();
     this._requestTimer = setTimeout(() => {
       this._requestTimer = null;
-      const { pageIndex, pageSize } = this._state;
-      const latest = this._lastRequest;
-      if (
-        this._options.mode !== 'server' ||
-        pageSize <= 0 ||
-        (latest && latest.pageIndex === pageIndex && latest.pageSize === pageSize)
-      ) {
-        return;
+      try {
+        this._debouncedRequest();
+      } catch (error) {
+        // Nobody can catch a timer's error: report it with context instead.
+        console.error('items-grid: onPageRequest threw for a debounced page request.', error);
       }
-      this._emitRequest({ pageIndex, pageSize });
     }, this._options.requestDebounceMs ?? DEFAULT_DEBOUNCE_MS);
   }
 
+  private _debouncedRequest(): void {
+    const { pageIndex, pageSize } = this._state;
+    const latest = this._lastRequest;
+    if (
+      this._options.mode !== 'server' ||
+      pageSize <= 0 ||
+      (latest && latest.pageIndex === pageIndex && latest.pageSize === pageSize)
+    ) {
+      return;
+    }
+    this._emitRequest({ pageIndex, pageSize });
+  }
+
   private _emitRequest(request: PageRequest): void {
+    const previous = this._lastRequest;
     this._lastRequest = request;
-    this._options.onPageRequest?.(request);
+    try {
+      this._options.onPageRequest?.(request);
+    } catch (error) {
+      // Not sent after all: asking for the same page again must retry it.
+      if (this._lastRequest === request) this._lastRequest = previous;
+      throw error;
+    }
   }
 
   private _cancelRequest(): void {
