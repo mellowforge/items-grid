@@ -23,7 +23,6 @@ import {
   getViewportStyle,
   getVisuallyHiddenStyle,
   type GridAlign,
-  isEditableTarget,
   type ItemKey,
   ItemsGridController,
   type ItemsGridHandle,
@@ -34,6 +33,7 @@ import {
   type PagerLabels,
   type PagingMode,
   type ReflowMode,
+  shouldPageGrid,
   type SizePreset,
 } from '@quietfoundry/items-grid-core';
 
@@ -175,7 +175,10 @@ export class QfItemsGrid<T> {
    */
   readonly pageIndex = input(0);
 
-  /** Server mode: delay before requesting a page after a resize, in ms. Default 150. */
+  /**
+   * Server mode: delay before requesting after a page-size change (resize, preset, measured
+   * row height…), in ms, so a drag-resize sends one request. Default 150.
+   */
   readonly requestDebounceMs = input<number | undefined>(undefined);
 
   /** Screen-reader announcements, merged over the English defaults. */
@@ -321,7 +324,7 @@ export class QfItemsGrid<T> {
   }
 
   protected onKeydown(event: KeyboardEvent): void {
-    if (!isEditableTarget(event.target) && this._controller.handleKeydown(event.key)) {
+    if (shouldPageGrid(event) && this._controller.handleKeydown(event.key)) {
       event.preventDefault();
     }
   }

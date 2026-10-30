@@ -23,7 +23,9 @@ import {
   },
   template: `
     <span class="qf-items-grid-pager__status">{{
-      state().loading ? '' : text().status(state().range, state().total, state().totalKnown)
+      state().loading || !state().geometry
+        ? ''
+        : text().status(state().range, state().total, state().totalKnown)
     }}</span>
     <div class="qf-items-grid-pager__list">
       <button

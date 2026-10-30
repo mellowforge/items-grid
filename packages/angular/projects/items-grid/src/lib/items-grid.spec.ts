@@ -27,6 +27,7 @@ const entities = (count: number): Entity[] =>
       [pager]="pager()"
       [preset]="preset()"
       [total]="total()"
+      [pagerLabels]="labels()"
       [(pageIndex)]="page"
       ariaLabel="Entities"
       (pageRequest)="requests.push($event)"
@@ -38,6 +39,9 @@ const entities = (count: number): Entity[] =>
           {{ item.name }}
           @if (withInput()) {
             <input [attr.aria-label]="'Note for ' + item.name" />
+          }
+          @if (handled()) {
+            <button type="button" class="eats-keys" (keydown)="$event.preventDefault()">x</button>
           }
         </article>
       </ng-template>
@@ -56,6 +60,8 @@ class HostComponent {
   readonly preset = signal('normal');
   readonly total = signal<number | undefined>(undefined);
   readonly withInput = signal(false);
+  readonly labels = signal<{ next?: string; page?: undefined } | undefined>(undefined);
+  readonly handled = signal(false);
   readonly requests: PageRequest[] = [];
   readonly pageChanges: number[] = [];
   lastPageSize = 0;
@@ -99,6 +105,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   fixture.destroy();
   vi.unstubAllGlobals();
 });
@@ -254,17 +261,82 @@ describe('QfItemsGrid', () => {
     expect(cards()[0]).toBe('Entity 24');
   });
 
-  it('sends no page request after it is destroyed', async () => {
+  it('cancels its pending page request when destroyed', async () => {
     host.mode.set('server');
     host.items.set([]);
     await layout();
-    vi.useFakeTimers();
+    // Without the controller's teardown the debounced request would fire into a destroyed
+    // output, which Angular only reports with a console warning.
+    const warn = vi.spyOn(console, 'warn');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     ResizeObserverStub.for(viewport()).fire(976, 552);
     flushFrames();
     fixture.destroy();
     vi.advanceTimersByTime(500);
     vi.useRealTimers();
     expect(host.requests).toEqual([{ pageIndex: 0, pageSize: 12 }]);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('surfaces invalid options as an error and recovers', async () => {
+    await layout();
+    host.preset.set('huge');
+    await expect(fixture.whenStable()).rejects.toThrow('items-grid: unknown preset "huge"');
+    host.preset.set('normal');
+    await fixture.whenStable();
+    expect(cards()).toHaveLength(12);
+  });
+
+  it('pages on while the server total is unknown and pages come back full', async () => {
+    host.mode.set('server');
+    host.items.set(entities(12));
+    await layout();
+    expect(element.querySelector('.qf-items-grid-pager__status')!.textContent!.trim()).toBe(
+      'Items 1–12',
+    );
+    expect(button('Page 2')).toBeTruthy();
+    await click(button('Next page'));
+    expect(host.requests.at(-1)).toEqual({ pageIndex: 1, pageSize: 12 });
+  });
+
+  it('passes pager labels through, ignoring undefined ones', async () => {
+    host.labels.set({ next: 'Weiter', page: undefined });
+    await layout();
+    expect(button('Weiter')).toBeTruthy();
+    expect(button('Page 1')).toBeTruthy();
+  });
+
+  it('reports reanchoring when a hidden grid is shown again', async () => {
+    host.items.set(entities(120));
+    await layout();
+    await click(button('Page 5')); // index 4, item 48
+    await layout(0, 0);
+    await layout(976, 552); // 9 per page → item 48 is on index 5
+    expect(host.page()).toBe(5);
+  });
+
+  it('does not page when a card already handled the key', async () => {
+    host.handled.set(true);
+    await layout();
+    element
+      .querySelector('.eats-keys')!
+      .dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'PageDown', bubbles: true, cancelable: true }),
+      );
+    await fixture.whenStable();
+    expect(cards()[0]).toBe('Entity 0 x');
+  });
+
+  it('keeps the pager status blank until the grid is measured', () => {
+    expect(element.querySelector('.qf-items-grid-pager__status')!.textContent!.trim()).toBe('');
+  });
+
+  it('does not warn about the item template when one is projected', async () => {
+    const warn = vi.spyOn(console, 'warn');
+    await layout();
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('qfItemsGridItem'));
+    warn.mockRestore();
   });
 
   it('measures the row height from a hidden probe card', async () => {
@@ -272,7 +344,7 @@ describe('QfItemsGrid', () => {
     await layout();
     const probe = element.querySelector<HTMLElement>('.qf-items-grid__probe')!;
     expect(probe.getAttribute('aria-hidden')).toBe('true');
-    ResizeObserverStub.for(probe).fire(280, 118, { inlineSize: 280, blockSize: 118 });
+    ResizeObserverStub.for(probe).fire(280, 100, { inlineSize: 280, blockSize: 118 });
     flushFrames();
     await fixture.whenStable();
     expect(viewport().style.gridAutoRows).toBe('118px');
