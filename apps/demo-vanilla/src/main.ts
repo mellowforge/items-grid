@@ -268,7 +268,9 @@ const grid = mountItemsGrid<Entity>(gridHost, {
   updateItem: updateCard,
   renderSkeleton: createSkeleton,
   renderEmpty: createEmpty,
-  onPageRequest: request => void loadPage(request),
+  onPageRequest: request => {
+    loadPage(request).catch(error => console.error(error));
+  },
   onStateChange: renderChrome,
 });
 
@@ -297,9 +299,12 @@ async function loadPage(request: PageRequest): Promise<void> {
   let response;
   try {
     response = await fetchPage(database, request);
-  } catch {
-    // A failed page keeps its slot; refresh() asks for it again.
-    if (seq !== requestSeq) return;
+  } catch (error) {
+    if (seq !== requestSeq || mode !== 'server') return;
+    console.error(error);
+    // Clear the stale cards so the old page never shows under the new page's numbers;
+    // refresh() asks for this page again.
+    serverIds = [];
     loading = false;
     errorBanner.hidden = false;
     syncData();
@@ -338,6 +343,7 @@ function setDensity(value: CardSize): void {
 
 function setMode(value: PagingMode): void {
   mode = value;
+  errorBanner.hidden = true;
   serverIds = [];
   serverTotal = undefined;
   loading = value === 'server';

@@ -56,22 +56,25 @@ export function App(): ReactElement {
     if (!quietRefresh.current) setServer(page => ({ ...page, loading: true }));
     quietRefresh.current = false;
     setLoadError(false);
-    fetchPage(latest.current.database, request).then(
-      response => {
+    const load = async (): Promise<void> => {
+      try {
+        const response = await fetchPage(latest.current.database, request);
         if (seq !== requestSeq.current || latest.current.mode !== 'server') return;
         setServer({
           ids: response.items.map(entity => entity.id),
           total: response.total,
           loading: false,
         });
-      },
-      () => {
-        // A failed page keeps its slot; refresh() asks for it again.
-        if (seq !== requestSeq.current) return;
-        setServer(page => ({ ...page, loading: false }));
+      } catch (error) {
+        if (seq !== requestSeq.current || latest.current.mode !== 'server') return;
+        console.error(error);
+        // Clear the stale cards so the old page never shows under the new page's numbers;
+        // refresh() asks for this page again.
+        setServer(page => ({ ...page, ids: [], loading: false }));
         setLoadError(true);
       }
-    );
+    };
+    void load();
   };
 
   useEffect(() => {
@@ -109,6 +112,7 @@ export function App(): ReactElement {
   const changeMode = (next: PagingMode): void => {
     setMode(next);
     setServer(NO_PAGE);
+    setLoadError(false);
   };
 
   return (

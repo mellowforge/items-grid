@@ -202,22 +202,26 @@ export class App {
     if (!this._quietRefresh) this.server.update((page) => ({ ...page, loading: true }));
     this._quietRefresh = false;
     this.loadError.set(false);
-    fetchPage(this.database(), request).then(
-      (response) => {
-        if (seq !== this._requestSeq || this.mode() !== 'server') return;
-        this.server.set({
-          ids: response.items.map((entity) => entity.id),
-          total: response.total,
-          loading: false,
-        });
-      },
-      () => {
-        // A failed page keeps its slot; refresh() asks for it again.
-        if (seq !== this._requestSeq) return;
-        this.server.update((page) => ({ ...page, loading: false }));
-        this.loadError.set(true);
-      },
-    );
+    void this._load(request, seq);
+  }
+
+  private async _load(request: PageRequest, seq: number): Promise<void> {
+    try {
+      const response = await fetchPage(this.database(), request);
+      if (seq !== this._requestSeq || this.mode() !== 'server') return;
+      this.server.set({
+        ids: response.items.map((entity) => entity.id),
+        total: response.total,
+        loading: false,
+      });
+    } catch (error) {
+      if (seq !== this._requestSeq || this.mode() !== 'server') return;
+      console.error(error);
+      // Clear the stale cards so the old page never shows under the new page's numbers;
+      // refresh() asks for this page again.
+      this.server.update((page) => ({ ...page, ids: [], loading: false }));
+      this.loadError.set(true);
+    }
   }
 
   protected onStateChange(state: ItemsGridState<Entity>): void {
@@ -227,6 +231,7 @@ export class App {
   protected changeMode(mode: PagingMode): void {
     this.mode.set(mode);
     this.server.set(NO_PAGE);
+    this.loadError.set(false);
   }
 
   protected toggle(id: string, enabled: boolean): void {

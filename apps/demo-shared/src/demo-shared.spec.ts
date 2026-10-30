@@ -31,6 +31,15 @@ describe('demo fixtures', () => {
     vi.useRealTimers();
   });
 
+  it('fails on request, for trying the retry path', async () => {
+    vi.useFakeTimers();
+    const promise = fetchPage(createEntities(30), { pageIndex: 0, pageSize: 12 }, 100, 1);
+    const assertion = expect(promise).rejects.toThrow('Page 1 failed to load');
+    vi.advanceTimersByTime(100);
+    await assertion;
+    vi.useRealTimers();
+  });
+
   it('shows the Figma card content per size', () => {
     const [device, , job] = createEntities(3);
     expect(cardView(device!, 'compact')).toMatchObject({ showSummary: true, details: [] });
