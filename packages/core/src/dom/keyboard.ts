@@ -21,7 +21,8 @@ export function isEditableTarget(target: EventTarget | null): boolean {
   const element = target as HTMLElement;
   if (element.isContentEditable) return true;
   const region = element.closest('[contenteditable]');
-  if (region && EDITABLE_VALUES.includes(region.getAttribute('contenteditable') ?? 'false')) {
+  const value = region?.getAttribute('contenteditable')?.toLowerCase();
+  if (value !== undefined && EDITABLE_VALUES.includes(value)) {
     return true;
   }
   const tag = element.tagName;
@@ -32,7 +33,9 @@ export function isEditableTarget(target: EventTarget | null): boolean {
 /**
  * Whether a keydown inside the grid may page it: not when something (e.g. a widget in a card)
  * already handled it, and not when it comes from an editable element — looked up through
- * shadow roots via `composedPath()`, since the event's `target` is retargeted to the host.
+ * open shadow roots via `composedPath()`, since the event's `target` is retargeted to the
+ * host. Inside a closed shadow root the editable element can't be seen; such a component
+ * should `preventDefault()` the keys it uses.
  */
 export function shouldPageGrid(event: Event): boolean {
   if (event.defaultPrevented) return false;

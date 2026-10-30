@@ -15,6 +15,7 @@ import {
   type Entity,
   fetchPage,
   MODE_OPTIONS,
+  type PageResponse,
   REFLOW_OPTIONS,
   startSimulation,
 } from 'demo-shared';
@@ -57,14 +58,9 @@ export function App(): ReactElement {
     quietRefresh.current = false;
     setLoadError(false);
     const load = async (): Promise<void> => {
+      let response: PageResponse;
       try {
-        const response = await fetchPage(latest.current.database, request);
-        if (seq !== requestSeq.current || latest.current.mode !== 'server') return;
-        setServer({
-          ids: response.items.map(entity => entity.id),
-          total: response.total,
-          loading: false,
-        });
+        response = await fetchPage(latest.current.database, request);
       } catch (error) {
         if (seq !== requestSeq.current || latest.current.mode !== 'server') return;
         console.error(error);
@@ -72,7 +68,14 @@ export function App(): ReactElement {
         // refresh() asks for this page again.
         setServer(page => ({ ...page, ids: [], loading: false }));
         setLoadError(true);
+        return;
       }
+      if (seq !== requestSeq.current || latest.current.mode !== 'server') return;
+      setServer({
+        ids: response.items.map(entity => entity.id),
+        total: response.total,
+        loading: false,
+      });
     };
     void load();
   };

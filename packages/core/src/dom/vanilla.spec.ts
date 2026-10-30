@@ -318,6 +318,66 @@ describe('mountItemsGrid', () => {
     expect(viewport().getAttribute('aria-label')).toBe('Entities');
   });
 
+  it('renders a new item shape with the new renderer in a single update', () => {
+    interface Order {
+      orderId: string;
+      label: string;
+    }
+    const grid = mount();
+    layout();
+    const orders: Order[] = Array.from({ length: 20 }, (_, n) => ({
+      orderId: `o${n}`,
+      label: `Order ${n}`,
+    }));
+    (grid as unknown as ItemsGridMount<Order>).update({
+      items: orders,
+      getKey: order => order.orderId,
+      renderItem: order => {
+        const card = document.createElement('article');
+        card.textContent = order.label;
+        return card;
+      },
+    } as Partial<MountItemsGridOptions<Order>>);
+    expect(texts()[0]).toBe('Order 0');
+    grid.update({ align: 'center' });
+    expect(texts()[0]).toBe('Order 0');
+  });
+
+  it('keeps a valid update applied when a callback throws afterwards', () => {
+    let fail = false;
+    const grid = mount({
+      onStateChange: () => {
+        if (fail) throw new Error('chrome failed');
+      },
+    });
+    layout();
+    fail = true;
+    const renamed = (item: Entity): HTMLElement => {
+      const card = document.createElement('article');
+      card.textContent = `New ${item.name}`;
+      return card;
+    };
+    expect(() => grid.update({ renderItem: renamed, items: entities(29) })).toThrow(
+      'chrome failed'
+    );
+    fail = false;
+    expect(texts()[0]).toBe('New Entity 0');
+    grid.update({ ariaLabel: 'Later' });
+    expect(texts()[0]).toBe('New Entity 0');
+  });
+
+  it('warns once when the handle is used after destroy', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const grid = mount();
+    grid.destroy();
+    mounted = null;
+    grid.controller.next();
+    grid.controller.goTo(2);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]![0]).toContain('after destroy()');
+    warn.mockRestore();
+  });
+
   it('ignores explicit undefined for getKey and renderItem', () => {
     const grid = mount();
     layout();
@@ -349,6 +409,7 @@ describe('mountItemsGrid', () => {
   });
 
   it('turns the handle inert after destroy', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const onPageChange = vi.fn();
     const grid = mount({ onPageChange });
     layout();

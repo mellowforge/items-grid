@@ -304,6 +304,21 @@ export function mountItemsGrid<T>(
   }
 
   function render(): void {
+    if (rebuildCards) {
+      // A new renderer means new markup: rebuild every card (and the probe).
+      rebuildCards = false;
+      for (const entry of cards.values()) entry.cell.remove();
+      cards.clear();
+      if (probe) {
+        probe.stop();
+        probe.element.remove();
+        probe = null;
+      }
+    }
+    if (rebuildSkeletons) {
+      rebuildSkeletons = false;
+      skeletons.splice(0).forEach(cell => cell.remove());
+    }
     const state = controller.getState();
     viewportStyle = applyStyle(viewport, getViewportStyle(state), viewportStyle);
     // The empty state is not a list item, so the viewport is only a list while it has cards.
@@ -337,32 +352,43 @@ export function mountItemsGrid<T>(
   }
 
   let destroyed = false;
+  let rebuildCards = false;
+  let rebuildSkeletons = false;
+  let warnedDestroyed = false;
+  /** Whether the grid was destroyed; warns once, since the app still holds a dead handle. */
+  const isDestroyed = (): boolean => {
+    if (destroyed && !warnedDestroyed) {
+      warnedDestroyed = true;
+      console.warn('items-grid: the grid was used after destroy(); the call is ignored.');
+    }
+    return destroyed;
+  };
   const unsubscribe = controller.subscribe(render);
   render();
 
   // The handle goes inert after destroy(), so late calls can't reach app callbacks.
   const handle: ItemsGridHandle<T> = {
     goTo: pageIndex => {
-      if (!destroyed) controller.goTo(pageIndex);
+      if (!isDestroyed()) controller.goTo(pageIndex);
     },
     next: () => {
-      if (!destroyed) controller.next();
+      if (!isDestroyed()) controller.next();
     },
     prev: () => {
-      if (!destroyed) controller.prev();
+      if (!isDestroyed()) controller.prev();
     },
     first: () => {
-      if (!destroyed) controller.first();
+      if (!isDestroyed()) controller.first();
     },
     last: () => {
-      if (!destroyed) controller.last();
+      if (!isDestroyed()) controller.last();
     },
     refresh: () => {
-      if (!destroyed) controller.refresh();
+      if (!isDestroyed()) controller.refresh();
     },
-    handleKeydown: key => !destroyed && controller.handleKeydown(key),
+    handleKeydown: key => !isDestroyed() && controller.handleKeydown(key),
     getState: controller.getState,
-    subscribe: listener => (destroyed ? () => {} : controller.subscribe(listener)),
+    subscribe: listener => (isDestroyed() ? () => {} : controller.subscribe(listener)),
   };
 
   return {
@@ -374,22 +400,25 @@ export function mountItemsGrid<T>(
       for (const key of ['getKey', 'renderItem'] as const) {
         if (key in next && next[key] === undefined) delete next[key];
       }
-      // Validate first: a rejected update must not touch the DOM or the mount's options.
-      controller.setOptions(controllerOptions(next));
-      if (next.renderItem && next.renderItem !== options.renderItem) {
-        // A new renderer means new markup: rebuild every card (and the probe).
-        for (const entry of cards.values()) entry.cell.remove();
-        cards.clear();
-        if (probe) {
-          probe.stop();
-          probe.element.remove();
-          probe = null;
-        }
-      }
-      if (next.renderSkeleton && next.renderSkeleton !== options.renderSkeleton) {
-        skeletons.splice(0).forEach(cell => cell.remove());
-      }
+      // Commit the mount's options first, so a render triggered by the controller below
+      // already uses the new renderers (the card rebuild happens inside that render).
+      const previous = { options, rebuildCards, rebuildSkeletons };
+      rebuildCards ||= !!next.renderItem && next.renderItem !== options.renderItem;
+      rebuildSkeletons ||= !!next.renderSkeleton && next.renderSkeleton !== options.renderSkeleton;
       options = { ...options, ...next };
+      const before = controller.getState();
+      try {
+        controller.setOptions(controllerOptions(next));
+      } catch (error) {
+        // Rejected (nothing changed in the controller): undo the mount's side as well.
+        if (controller.getState() === before) {
+          ({ options, rebuildCards, rebuildSkeletons } = previous);
+          throw error;
+        }
+        // Applied, but app code threw afterwards: keep the update and show it.
+        render();
+        throw error;
+      }
       render();
     },
     destroy() {

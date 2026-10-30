@@ -10,6 +10,7 @@ describe('isEditableTarget', () => {
     ['contenteditable', '<div contenteditable="true"></div>'],
     ['empty contenteditable', '<div contenteditable=""></div>'],
     ['plaintext-only', '<div contenteditable="plaintext-only"></div>'],
+    ['upper-case TRUE', '<div contenteditable="TRUE"></div>'],
     ['a search field', '<input type="search" />'],
   ])('is true for %s, whose own keys must not page the grid', (_, html) => {
     const host = document.createElement('div');

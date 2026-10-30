@@ -918,7 +918,10 @@ describe('ItemsGridController — round 2', () => {
     expect(() => controller.goTo(2)).toThrow('first subscriber');
     expect(second).toHaveBeenCalled();
     expect(onPageChange).toHaveBeenLastCalledWith(2);
-    expect(errors).toHaveBeenCalledWith(expect.objectContaining({ message: 'request failed' }));
+    expect(errors).toHaveBeenCalledWith(
+      expect.stringContaining('onPageRequest'),
+      expect.objectContaining({ message: 'request failed' })
+    );
     errors.mockRestore();
   });
 
@@ -960,5 +963,105 @@ describe('ItemsGridController — round 2', () => {
 
   it('freezes the geometry too', () => {
     expect(Object.isFrozen(setup().getState().geometry)).toBe(true);
+  });
+});
+
+describe('ItemsGridController — round 3 (re-entrancy)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  it('anchors on the new page when mode and pageIndex change together', () => {
+    const controller = setup();
+    controller.goTo(5);
+    controller.setOptions({ mode: 'server', items: entities(12), total: 300, pageIndex: 0 });
+    controller.setViewportSize(NARROW);
+    expect(controller.getState().pageIndex).toBe(0);
+  });
+
+  it('keeps the page report and the immediate request when a subscriber syncs without navigating', () => {
+    const requests: PageRequest[] = [];
+    const onPageChange = vi.fn();
+    const controller = setup({
+      mode: 'server',
+      items: [],
+      total: 120,
+      onPageRequest: request => requests.push(request),
+      onPageChange,
+    });
+    controller.subscribe(() => controller.setOptions({ items: [] }));
+    controller.goTo(3);
+    expect(onPageChange).toHaveBeenLastCalledWith(3);
+    expect(requests.at(-1)).toEqual({ pageIndex: 3, pageSize: 12 });
+  });
+
+  it('keeps the page report when a subscriber changes a visual option', () => {
+    const onPageChange = vi.fn();
+    const controller = setup({ onPageChange });
+    controller.subscribe(() => controller.setOptions({ align: 'center' }));
+    controller.goTo(2);
+    expect(onPageChange).toHaveBeenLastCalledWith(2);
+  });
+
+  it('keeps a pending resize request when a mode switch is rolled back', () => {
+    const requests: PageRequest[] = [];
+    const controller = setup({
+      mode: 'server',
+      items: [],
+      total: 120,
+      onPageRequest: request => requests.push(request),
+    });
+    controller.setViewportSize(NARROW);
+    expect(() =>
+      controller.setOptions({ mode: 'client', items: [null as unknown as Entity] })
+    ).toThrow();
+    vi.advanceTimersByTime(500);
+    expect(requests.at(-1)).toEqual({ pageIndex: 0, pageSize: 9 });
+  });
+
+  it('keeps the page report when a subscriber starts loading during navigation', () => {
+    const onPageChange = vi.fn();
+    const requests: PageRequest[] = [];
+    const controller = setup({
+      mode: 'server',
+      items: [],
+      total: 120,
+      onPageChange,
+      onPageRequest: request => requests.push(request),
+    });
+    controller.subscribe(() => controller.setOptions({ loading: true }));
+    controller.goTo(2);
+    expect(onPageChange).toHaveBeenLastCalledWith(2);
+    expect(requests.at(-1)).toEqual({ pageIndex: 2, pageSize: 12 });
+  });
+
+  it('runs no effects for a sync that a subscriber destroyed', () => {
+    const requests: PageRequest[] = [];
+    const onPageChange = vi.fn();
+    const controller = setup({
+      mode: 'server',
+      items: [],
+      total: 120,
+      onPageRequest: request => requests.push(request),
+      onPageChange,
+    });
+    controller.subscribe(() => controller.destroy());
+    controller.goTo(3);
+    vi.advanceTimersByTime(500);
+    expect(requests).toHaveLength(1);
+    expect(onPageChange).not.toHaveBeenCalled();
+  });
+
+  it('takes a new stable baseline when a server page clamps', () => {
+    const controller = setup({
+      mode: 'server',
+      items: entities(12),
+      total: 100,
+      reflow: 'stable',
+    });
+    controller.goTo(5);
+    controller.setOptions({ total: 30 });
+    controller.setOptions({ total: 50 });
+    expect(controller.getState().pendingCount).toBe(20);
   });
 });

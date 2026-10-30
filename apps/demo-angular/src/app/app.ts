@@ -21,6 +21,7 @@ import {
   type Entity,
   fetchPage,
   MODE_OPTIONS,
+  type PageResponse,
   REFLOW_OPTIONS,
   startSimulation,
 } from 'demo-shared';
@@ -206,14 +207,9 @@ export class App {
   }
 
   private async _load(request: PageRequest, seq: number): Promise<void> {
+    let response: PageResponse;
     try {
-      const response = await fetchPage(this.database(), request);
-      if (seq !== this._requestSeq || this.mode() !== 'server') return;
-      this.server.set({
-        ids: response.items.map((entity) => entity.id),
-        total: response.total,
-        loading: false,
-      });
+      response = await fetchPage(this.database(), request);
     } catch (error) {
       if (seq !== this._requestSeq || this.mode() !== 'server') return;
       console.error(error);
@@ -221,7 +217,14 @@ export class App {
       // refresh() asks for this page again.
       this.server.update((page) => ({ ...page, ids: [], loading: false }));
       this.loadError.set(true);
+      return;
     }
+    if (seq !== this._requestSeq || this.mode() !== 'server') return;
+    this.server.set({
+      ids: response.items.map((entity) => entity.id),
+      total: response.total,
+      loading: false,
+    });
   }
 
   protected onStateChange(state: ItemsGridState<Entity>): void {

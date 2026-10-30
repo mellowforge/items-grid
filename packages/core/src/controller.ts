@@ -313,21 +313,33 @@ const freezeState = <T>(state: ItemsGridState<T>): ItemsGridState<T> => {
   return Object.freeze(state);
 };
 
+/** An error from app code called during a sync, and where it came from. */
+interface Caught {
+  readonly source: string;
+  readonly error: unknown;
+}
+
 /** Errors collected during a sync; the first is rethrown, the rest are logged. */
 interface Failure {
-  readonly errors: readonly unknown[];
+  readonly errors: readonly Caught[];
 }
 
 function rethrow(failure: Failure | null): void {
   if (!failure) return;
   const [first, ...rest] = failure.errors;
-  for (const error of rest) console.error(error);
-  throw first;
+  for (const { source, error } of rest) {
+    console.error(
+      `items-grid: ${source} threw during an update; the first error was rethrown.`,
+      error
+    );
+  }
+  throw first!.error;
 }
 
-/** Side effects of one sync, run after subscribers have seen the new state. */
-interface SyncEffects {
-  readonly request: { readonly immediate: boolean; readonly force: boolean } | 'cancel' | null;
+/** How soon the page request a sync asks for must go out. */
+interface OwedRequest {
+  readonly immediate: boolean;
+  readonly force: boolean;
 }
 
 /**
@@ -358,8 +370,12 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   private readonly _warnedKeys = new Set<string>();
   /** `false` while the constructor derives the first state, which is never reported. */
   private _ready = false;
-  /** Bumped by every commit, so a sync can tell that a callback ran a newer one. */
-  private _generation = 0;
+  /** Syncs in progress; effects run only when the outermost one finishes. */
+  private _depth = 0;
+  /** The page request the syncs since the last effects run asked for, if any. */
+  private _owedRequest: OwedRequest | null = null;
+  /** The page index last reported through `onPageChange` (or the initial one). */
+  private _reportedPageIndex: number;
 
   /** @throws an `items-grid:` error for invalid options. */
   constructor(options: ItemsGridOptions<T>) {
@@ -368,7 +384,9 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     this._options = normalized;
     this._pageIndex = Math.floor(normalized.pageIndex ?? 0);
     this._state = freezeState(this._unmeasuredState(0, true, false, false));
+    this._reportedPageIndex = this._pageIndex;
     rethrow(this._sync('options'));
+    this._reportedPageIndex = this._state.pageIndex;
     this._ready = true;
   }
 
@@ -402,8 +420,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     this._options = next;
     const modeChanged = (previous.mode ?? 'client') !== (next.mode ?? 'client');
     if (modeChanged) {
-      // A new data source: forget the last request and the frozen page.
-      this._cancelRequest();
+      // A new data source: forget the last request (the 'mode' sync requests or cancels).
       this._lastRequest = null;
     }
     if (modeChanged || previous.reflow !== next.reflow) {
@@ -422,7 +439,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
 
     let failure: Failure | null;
     try {
-      failure = this._sync(modeChanged ? 'mode' : navigated ? 'navigate' : 'options');
+      failure = this._sync(modeChanged ? 'mode' : navigated ? 'navigate' : 'options', navigated);
     } catch (error) {
       this._options = previous;
       this._snapshot = saved.snapshot;
@@ -534,6 +551,9 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   destroy(): void {
     this._cancelRequest();
     this._lastRequest = null;
+    // Nothing owed survives: a sync that a subscriber destroyed runs no effects.
+    this._owedRequest = null;
+    this._reportedPageIndex = this._state.pageIndex;
     this._listeners.clear();
   }
 
@@ -573,7 +593,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
    * Derives and commits the state for `cause`. Throws only before committing; errors from
    * subscribers and callbacks are collected and returned for the caller to rethrow.
    */
-  private _sync(cause: SyncCause): Failure | null {
+  private _sync(cause: SyncCause, navigated = false): Failure | null {
     const options = this._options;
     const items = options.items ?? EMPTY;
     const isServer = options.mode === 'server';
@@ -601,8 +621,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
         freezeState(
           this._unmeasuredState(totalKnown ? knownTotal : 0, totalKnown, loading, isEmpty)
         ),
-        previous,
-        { request: 'cancel' }
+        { immediate: false, force: false }
       );
     }
 
@@ -613,7 +632,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     const boundTotal = totalKnown ? knownTotal : Number.MAX_SAFE_INTEGER;
     const boundPageCount = getPageCount(boundTotal, pageSize);
     let pageIndex = this._pageIndex;
-    const freeze =
+    let freeze =
       cause === 'navigate' ||
       cause === 'refresh' ||
       cause === 'mode' ||
@@ -637,9 +656,11 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
       if (clamped !== pageIndex) {
         pageIndex = clamped;
         requestNow = true;
+        // A stable page that had to move shows (and counts from) the current data.
+        freeze = true;
       }
     }
-    if (firstLayout || cause === 'navigate') {
+    if (firstLayout || cause === 'navigate' || navigated) {
       this._anchorIndex =
         firstLayout && this._anchorIndex !== null ? this._anchorIndex : pageIndex * pageSize;
     }
@@ -756,54 +777,68 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
         probeItem: options.measureRowHeight ? (options.sampleItem ?? items[0]) : undefined,
         announcement: this._announcement,
       }),
-      previous,
-      { request: isServer ? { immediate: requestNow, force: cause === 'refresh' } : 'cancel' }
+      { immediate: requestNow, force: cause === 'refresh' }
     );
   }
 
   /**
-   * Commits the state, then runs the side effects — even when a subscriber throws, so a
-   * failing render never swallows a page request or a page-change report. If a subscriber
-   * or callback synced again meanwhile (e.g. navigated), its newer effects already ran and
-   * these stale ones are skipped. Every error is collected and returned.
+   * Commits the state and notifies, then — once the outermost sync is done — runs the side
+   * effects from the controller's own bookkeeping: the page request the syncs asked for, and
+   * an `onPageChange` when the page differs from the last one reported. So a subscriber that
+   * syncs again (navigates, starts loading, destroys the grid) can neither drop nor reorder
+   * them. Effects run even when a subscriber throws; every error is collected and returned.
    */
-  private _finish(
-    next: ItemsGridState<T>,
-    previous: ItemsGridState<T>,
-    effects: SyncEffects
-  ): Failure | null {
-    const generation = ++this._generation;
-    const errors: unknown[] = [];
-    const attempt = (run: () => void): void => {
+  private _finish(next: ItemsGridState<T>, request: OwedRequest): Failure | null {
+    const errors: Caught[] = [];
+    const attempt = (source: string, run: () => void): void => {
       try {
         run();
       } catch (error) {
-        errors.push(error);
+        errors.push({ source, error });
       }
     };
-    if (!sameState(this._state, next)) {
-      this._state = next;
-      for (const listener of [...this._listeners]) attempt(listener);
-      if (this._ready) attempt(() => this._options.onStateChange?.(next));
+    const owed = this._owedRequest;
+    this._owedRequest = {
+      immediate: request.immediate || !!owed?.immediate,
+      force: request.force || !!owed?.force,
+    };
+    this._depth++;
+    try {
+      if (!sameState(this._state, next)) {
+        this._state = next;
+        for (const listener of [...this._listeners]) attempt('a subscriber', listener);
+        if (this._ready) attempt('onStateChange', () => this._options.onStateChange?.(next));
+      }
+    } finally {
+      this._depth--;
     }
-    if (generation === this._generation) {
-      const request = effects.request;
-      if (request === 'cancel') {
-        this._cancelRequest();
-      } else if (request) {
-        attempt(() =>
-          this._request(
-            { pageIndex: next.pageIndex, pageSize: next.pageSize },
-            request.immediate,
-            request.force
-          )
-        );
-      }
-      if (this._ready && next.pageIndex !== previous.pageIndex) {
-        attempt(() => this._options.onPageChange?.(next.pageIndex));
-      }
+    if (this._depth === 0) {
+      this._runEffects(attempt);
     }
     return errors.length ? { errors } : null;
+  }
+
+  private _runEffects(attempt: (source: string, run: () => void) => void): void {
+    const owed = this._owedRequest;
+    this._owedRequest = null;
+    const state = this._state;
+    if (owed) {
+      if (this._options.mode === 'server' && state.geometry) {
+        attempt('onPageRequest', () =>
+          this._request(
+            { pageIndex: state.pageIndex, pageSize: state.pageSize },
+            owed.immediate,
+            owed.force
+          )
+        );
+      } else {
+        this._cancelRequest();
+      }
+    }
+    if (this._ready && state.pageIndex !== this._reportedPageIndex) {
+      this._reportedPageIndex = state.pageIndex;
+      attempt('onPageChange', () => this._options.onPageChange?.(state.pageIndex));
+    }
   }
 
   private _warnDuplicates(items: readonly T[]): void {

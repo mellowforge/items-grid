@@ -142,7 +142,8 @@ once per page load where ResizeObserver is missing, e.g. jsdom tests), `getViewp
 friends (the inline layout styles), `shouldPageGrid` and `isEditableTarget`,
 `ITEMS_GRID_CLASSES`, `getPagerItems`, `resolvePagerLabels`, `DEFAULT_PAGER_LABELS`.
 
-After `destroy()`, the vanilla mount's handle is inert and `update()` throws.
+After `destroy()`, the vanilla mount's handle ignores calls (warning once) and `update()`
+throws.
 
 ## Accessibility
 

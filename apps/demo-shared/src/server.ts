@@ -13,8 +13,14 @@ export interface PageResponse {
  * `?fail=0.3`), so the demos' error and retry path can be tried by hand. Default 0.
  */
 export function demoFailureRate(): number {
-  const value = Number(new URLSearchParams(globalThis.location?.search ?? '').get('fail'));
-  return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
+  const raw = new URLSearchParams(globalThis.location?.search ?? '').get('fail');
+  if (raw === null) return 0;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    console.warn(`demo: ?fail=${raw} is not a share between 0 and 1 (e.g. 0.3); ignoring it.`);
+    return 0;
+  }
+  return value;
 }
 
 /**
