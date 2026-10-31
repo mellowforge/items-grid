@@ -152,7 +152,8 @@ works. It touches no DOM. Apps get only the `ItemsGridHandle` from the adapters 
 Helpers for adapters: `observeSize` (ResizeObserver, one report per animation frame; warns
 once per page load where ResizeObserver is missing, e.g. jsdom tests), `getViewportStyle` and
 friends (the inline layout styles), `shouldPageGrid` and `isEditableTarget`,
-`ITEMS_GRID_CLASSES`, `getPagerItems`, `resolvePagerLabels`, `DEFAULT_PAGER_LABELS`.
+`ITEMS_GRID_CLASSES`, `getPagerItems`, `resolvePagerLabels`, `DEFAULT_PAGER_LABELS`,
+`attachCardNavigation` and `getCardMove` (see [Arrow keys](#arrow-keys-arrowkeys-opt-in)).
 
 After `destroy()`, the vanilla mount's handle ignores calls (warning once) and `update()`
 throws.
@@ -166,10 +167,32 @@ while focus is inside a card, except in text fields, selects and contenteditable
 (also inside shadow roots), and except when the card already handled the key. The pager
 uses real buttons with labels and `aria-current="page"`.
 
+### Arrow keys (`arrowKeys`, opt-in)
+
+`mountItemsGrid({ arrowKeys: true })`, `<ItemsGrid arrowKeys>` and
+`<mf-items-grid [arrowKeys]="true">` let the keyboard move between cards. One card at a time
+is a tab stop (the cells get a roving `tabindex`; your card markup is never touched), so Tab
+enters the grid once and then continues into that card's own controls. With focus on a card:
+
+| Key        | Moves to                                                                                                                                                  |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ← / →      | the previous / next card in reading order (swapped in a right-to-left layout); past the last card to the next page, before the first to the previous page |
+| ↑ / ↓      | the card above / below; past the top or bottom row to the same column on the previous / next page                                                         |
+| Home / End | the first / last card on the page                                                                                                                         |
+
+Keys pressed inside a card's own controls stay theirs; Escape there returns focus to the card.
+Reaching a control with Tab makes its card the arrow start. When the grid pages from the
+keyboard (arrows, PageUp / PageDown), focus moves to the card at the same position on the new
+page — in server mode once its cards arrive — unless focus has gone elsewhere meanwhile. The
+optional stylesheet draws a `:focus-visible` ring on focused cards (`--mf-items-grid-focus-ring`).
+For your own renderer, `attachCardNavigation(viewport, controller)` does all of this for the
+viewport's `role="listitem"` children and returns a detach function; `getCardMove` is the pure
+key-to-target rule.
+
 ## Styling
 
 Layout is applied inline; no stylesheet is required. `@mellowforge/items-grid-core/styles.css`
-is an optional, minimal pager theme. Theme it with `--mf-items-grid-*` custom properties set
+is an optional, minimal pager theme (plus the focus ring of cards with `arrowKeys`). Theme it with `--mf-items-grid-*` custom properties set
 anywhere up the tree (e.g. `:root`); every value has a fallback, so the pager also works when
 placed outside the grid. Class hooks: `mf-items-grid`, `mf-items-grid__viewport`, `__cell`,
 `__cell--skeleton`, `__empty`, `__probe`, `__live`, `mf-items-grid-pager`, `__status`,

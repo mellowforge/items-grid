@@ -19,7 +19,8 @@ import {
  * `useLayoutEffect` in the browser, `useEffect` on the server: neither runs there, but React 18
  * warns about every layout effect it renders on the server (e.g. Next.js client components).
  */
-const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+export const useIsomorphicLayoutEffect =
+  typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 /** What {@link useItemsGrid} returns. */
 export interface UseItemsGridResult<T> {

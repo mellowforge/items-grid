@@ -426,3 +426,73 @@ describe('ItemsGrid', () => {
     expect(cards()[0]).toBe('Entity 12');
   });
 });
+
+describe('ItemsGrid — arrowKeys', () => {
+  /** Lets the MutationObserver that follows the cards run. */
+  const settle = (): Promise<void> =>
+    act(() => new Promise<void>(resolve => setTimeout(resolve, 0)));
+  const cells = (): HTMLElement[] => screen.queryAllByRole('listitem');
+  const focused = (): string => document.activeElement?.textContent ?? '';
+  const tabStops = (): string[] =>
+    cells()
+      .filter(cell => cell.getAttribute('tabindex') === '0')
+      .map(cell => cell.textContent ?? '');
+
+  it('is off by default: cards are not tab stops', async () => {
+    render(<Grid />);
+    layout();
+    await settle();
+    expect(cells().some(cell => cell.hasAttribute('tabindex'))).toBe(false);
+  });
+
+  it('moves focus between cards and across pages with the arrow keys', async () => {
+    render(<Grid arrowKeys />);
+    layout();
+    await settle();
+    expect(tabStops()).toEqual(['Entity 0']);
+    act(() => cells()[0]!.focus());
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+    expect(focused()).toBe('Entity 4');
+    fireEvent.keyDown(document.activeElement!, { key: 'End' });
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' });
+    await settle();
+    expect(cards()[0]).toBe('Entity 12');
+    expect(focused()).toBe('Entity 12');
+  });
+
+  it('keeps focus on the card at the same position when PageDown pages', async () => {
+    render(<Grid arrowKeys />);
+    layout();
+    await settle();
+    act(() => cells()[5]!.focus());
+    fireEvent.keyDown(document.activeElement!, { key: 'PageDown' });
+    await settle();
+    expect(focused()).toBe('Entity 17');
+    // The last page has 6 cards: focus clamps to the last one.
+    fireEvent.keyDown(document.activeElement!, { key: 'PageDown' });
+    await settle();
+    expect(focused()).toBe('Entity 29');
+  });
+
+  it('turns off when the prop does, and detaches under StrictMode remounts', async () => {
+    const { rerender } = render(
+      <StrictMode>
+        <Grid arrowKeys />
+      </StrictMode>
+    );
+    layout();
+    await settle();
+    expect(tabStops()).toEqual(['Entity 0']);
+    act(() => cells()[0]!.focus());
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' });
+    // One attached helper: a leaked second one would move focus twice.
+    expect(focused()).toBe('Entity 1');
+    rerender(
+      <StrictMode>
+        <Grid arrowKeys={false} />
+      </StrictMode>
+    );
+    await settle();
+    expect(cells().some(cell => cell.hasAttribute('tabindex'))).toBe(false);
+  });
+});

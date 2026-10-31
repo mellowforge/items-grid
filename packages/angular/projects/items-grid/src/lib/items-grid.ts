@@ -25,6 +25,7 @@ import {
   type GridAlign,
   type ItemKey,
   ItemsGridController,
+  attachCardNavigation,
   type ItemsGridHandle,
   type ItemsGridMessages,
   type ItemsGridState,
@@ -207,6 +208,13 @@ export class MfItemsGrid<T> {
   /** Texts of the built-in pager. */
   readonly pagerLabels = input<Partial<PagerLabels> | undefined>(undefined);
 
+  /**
+   * Arrow keys move focus between cards: one card is the tab stop, Home / End jump to the
+   * first / last card, the arrows cross pages at the edges, and Escape in a card's control
+   * returns to the card. Default `false`.
+   */
+  readonly arrowKeys = input(false);
+
   /** Accessible name of the card list. */
   readonly ariaLabel = input<string | undefined>(undefined);
 
@@ -309,6 +317,12 @@ export class MfItemsGrid<T> {
     effect((onCleanup) => {
       const viewport = this._viewport().nativeElement;
       onCleanup(observeSize(viewport, (size) => this._controller.setViewportSize(size)));
+    });
+
+    effect((onCleanup) => {
+      if (this.arrowKeys()) {
+        onCleanup(attachCardNavigation(this._viewport().nativeElement, this._controller));
+      }
     });
 
     effect((onCleanup) => {

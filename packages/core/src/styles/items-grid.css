@@ -1,5 +1,6 @@
 /*
- * @mellowforge/items-grid-core/styles.css — optional pager theme.
+ * @mellowforge/items-grid-core/styles.css — optional pager theme (and the focus ring of
+ * cards with `arrowKeys`).
  *
  * Layout never depends on this file: the grid applies its track layout inline. Import it
  * for a minimal pager look, or skip it and style the `mf-items-grid*` class hooks yourself.
@@ -16,8 +17,15 @@
 /* Private: the default accent, swapped for a scheme-aware one below. Declared on the
    button too, so a custom pager that reuses only the button class keeps it. */
 .mf-items-grid-pager,
-.mf-items-grid-pager__button {
+.mf-items-grid-pager__button,
+.mf-items-grid__cell {
   --_mf-items-grid-accent: #4f46e5;
+}
+
+/* Cards focused with arrowKeys. Inset, since cells clip their overflow. */
+.mf-items-grid__cell:focus-visible {
+  outline: 2px solid var(--mf-items-grid-focus-ring, var(--_mf-items-grid-accent));
+  outline-offset: -2px;
 }
 
 .mf-items-grid-pager {
@@ -83,7 +91,8 @@
 
 @supports (color: light-dark(#000, #fff)) {
   .mf-items-grid-pager,
-  .mf-items-grid-pager__button {
+  .mf-items-grid-pager__button,
+  .mf-items-grid__cell {
     --_mf-items-grid-accent: light-dark(#4f46e5, #a4bcfd);
   }
 }

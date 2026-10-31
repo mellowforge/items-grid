@@ -8,6 +8,7 @@ import {
 import { getPagerItems, type PagerItem } from '../engine/paging';
 import type { ItemKey } from '../engine/types';
 import { type PagerLabels, resolvePagerLabels } from '../pager';
+import { attachCardNavigation } from './card-navigation';
 import { shouldPageGrid } from './keyboard';
 import { observeSize } from './observe';
 import {
@@ -40,6 +41,11 @@ export interface MountItemsGridOptions<T> extends ItemsGridOptions<T> {
   readonly renderEmpty?: () => HTMLElement;
   /** Render the built-in pager below the grid. Default `true`. */
   readonly pager?: boolean;
+  /**
+   * Arrow keys move focus between cards (one card is the tab stop; Home / End, page
+   * crossing at the edges, Escape from a card's control back to the card). Default `false`.
+   */
+  readonly arrowKeys?: boolean;
   /** Accessible name of the card list. */
   readonly ariaLabel?: string;
   /** Pager texts, merged over the defaults (`DEFAULT_PAGER_LABELS`). */
@@ -73,6 +79,7 @@ const MOUNT_ONLY_KEYS = [
   'renderSkeleton',
   'renderEmpty',
   'pager',
+  'arrowKeys',
   'ariaLabel',
   'pagerLabels',
 ] as const;
@@ -158,6 +165,7 @@ export function mountItemsGrid<T>(
     next: HTMLButtonElement;
     slots: { item: PagerItem; element: HTMLElement }[];
   } | null = null;
+  let detachNavigation: (() => void) | null = null;
   let destroyed = false;
   let rebuildCards = false;
   let rebuildSkeletons = false;
@@ -365,6 +373,12 @@ export function mountItemsGrid<T>(
 
     renderProbe(state);
     renderPager(state);
+    if (options.arrowKeys && !detachNavigation) {
+      detachNavigation = attachCardNavigation(viewport, controller);
+    } else if (!options.arrowKeys && detachNavigation) {
+      detachNavigation();
+      detachNavigation = null;
+    }
     if (live.textContent !== state.announcement) live.textContent = state.announcement;
   }
 
@@ -442,6 +456,7 @@ export function mountItemsGrid<T>(
       stopViewport();
       probe?.stop();
       controller.destroy();
+      detachNavigation?.();
       viewport.removeEventListener('keydown', onKeydown);
       viewport.remove();
       live.remove();

@@ -235,6 +235,12 @@ const realtimeInput = element('input');
 realtimeInput.type = 'checkbox';
 realtimeLabel.append(realtimeInput, document.createTextNode('Realtime'));
 
+const arrowKeysLabel = element('label', 'toggle');
+const arrowKeysInput = element('input');
+arrowKeysInput.type = 'checkbox';
+arrowKeysInput.checked = true;
+arrowKeysLabel.append(arrowKeysInput, document.createTextNode('Arrow keys'));
+
 toolbar.append(
   element('h1', 'toolbar__title', 'Entities'),
   count,
@@ -246,7 +252,8 @@ toolbar.append(
   segmented('Updates', REFLOW_OPTIONS, () => reflow, setReflow),
   segmented('Align', ALIGN_OPTIONS, () => align, setAlign),
   segmented('Max', MAX_PAGE_OPTIONS, () => maxPage, setMaxPage),
-  realtimeLabel
+  realtimeLabel,
+  arrowKeysLabel
 );
 const gridHost = element('section', 'app__grid');
 main.append(toolbar, gridHost);
@@ -265,6 +272,7 @@ const rendererFor = (size: CardSize): ((entity: Entity) => HTMLElement) => {
 };
 
 const grid = mountItemsGrid<Entity>(gridHost, {
+  arrowKeys: arrowKeysInput.checked,
   getKey: entity => entity.id,
   items: database,
   preset: density,
@@ -369,6 +377,10 @@ function setMaxPage(value: MaxPageChoice): void {
   maxPage = value;
   grid.update({ maxPageSize: maxPageSizeOf(value) });
 }
+
+arrowKeysInput.addEventListener('change', () => {
+  grid.update({ arrowKeys: arrowKeysInput.checked });
+});
 
 realtimeInput.addEventListener('change', () => {
   stopSimulation?.();

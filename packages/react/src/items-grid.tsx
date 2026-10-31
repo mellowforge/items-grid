@@ -10,6 +10,7 @@ import {
   type ItemsGridOptions,
   type ItemsGridState,
   type PagerLabels,
+  attachCardNavigation,
   shouldPageGrid,
 } from '@mellowforge/items-grid-core';
 import {
@@ -24,8 +25,9 @@ import {
 } from 'react';
 
 import { ItemsGridPager } from './pager';
+
 import { toReactStyle } from './style';
-import { useItemsGrid } from './use-items-grid';
+import { useIsomorphicLayoutEffect, useItemsGrid } from './use-items-grid';
 
 const HOST_STYLE = toReactStyle(getHostStyle());
 const CELL_STYLE = toReactStyle(getCellStyle());
@@ -56,6 +58,12 @@ export interface ItemsGridProps<T> extends ItemsGridOptions<T> {
   pager?: boolean | ((context: ItemsGridPagerContext<T>) => ReactNode);
   /** Texts of the built-in pager. */
   pagerLabels?: Partial<PagerLabels>;
+  /**
+   * Arrow keys move focus between cards: one card is the tab stop, Home / End jump to the
+   * first / last card, the arrows cross pages at the edges, and Escape in a card's control
+   * returns to the card. Default `false`.
+   */
+  arrowKeys?: boolean;
   /** Accessible name of the card list. */
   'aria-label'?: string;
   /** Extra class on the host element. */
@@ -74,6 +82,7 @@ function ItemsGridInner<T>(
     renderEmpty,
     pager = true,
     pagerLabels,
+    arrowKeys = false,
     'aria-label': ariaLabel,
     className,
     style,
@@ -81,6 +90,12 @@ function ItemsGridInner<T>(
   } = props;
   const { controller, state, viewportRef, probeRef } = useItemsGrid(options);
   useImperativeHandle(ref, () => controller, [controller]);
+
+  useIsomorphicLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (!arrowKeys || !viewport) return undefined;
+    return attachCardNavigation(viewport, controller);
+  }, [arrowKeys, controller, viewportRef]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (shouldPageGrid(event.nativeEvent) && controller.handleKeydown(event.key)) {

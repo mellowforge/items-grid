@@ -33,6 +33,7 @@ const entities = (count: number): Entity[] =>
       [preset]="preset()"
       [total]="total()"
       [pagerLabels]="labels()"
+      [arrowKeys]="arrowKeys()"
       [(pageIndex)]="page"
       ariaLabel="Entities"
       (pageRequest)="requests.push($event)"
@@ -67,6 +68,7 @@ class HostComponent {
   readonly withInput = signal(false);
   readonly labels = signal<{ next?: string; page?: undefined } | undefined>(undefined);
   readonly handled = signal(false);
+  readonly arrowKeys = signal(false);
   readonly requests: PageRequest[] = [];
   readonly pageChanges: number[] = [];
   lastPageSize = 0;
@@ -518,5 +520,71 @@ describe('MfItemsGrid — composition', () => {
     await custom.whenStable();
     expect(root.querySelector('[role="listitem"]')!.textContent!.trim()).toBe('Entity 12');
     custom.destroy();
+  });
+});
+
+describe('MfItemsGrid — arrowKeys', () => {
+  /** Lets the MutationObserver that follows the cards run, then Angular render. */
+  async function settle(): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await fixture.whenStable();
+  }
+  const cells = (): HTMLElement[] => Array.from(element.querySelectorAll('[role="listitem"]'));
+  const focused = (): string => document.activeElement?.textContent?.trim() ?? '';
+  const tabStops = (): string[] =>
+    cells()
+      .filter((cell) => cell.getAttribute('tabindex') === '0')
+      .map((cell) => cell.textContent?.trim() ?? '');
+  const press = (key: string): void => {
+    document.activeElement!.dispatchEvent(
+      new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+    );
+  };
+
+  beforeEach(() => document.body.append(element));
+
+  it('is off by default: cards are not tab stops', async () => {
+    await layout();
+    await settle();
+    expect(cells().some((cell) => cell.hasAttribute('tabindex'))).toBe(false);
+  });
+
+  it('moves focus between cards and across pages with the arrow keys', async () => {
+    host.arrowKeys.set(true);
+    await layout();
+    await settle();
+    expect(tabStops()).toEqual(['Entity 0']);
+    cells()[0]!.focus();
+    press('ArrowDown');
+    expect(focused()).toBe('Entity 4');
+    press('End');
+    press('ArrowRight');
+    await settle();
+    expect(cards()[0]).toBe('Entity 12');
+    expect(focused()).toBe('Entity 12');
+  });
+
+  it('keeps focus on the card at the same position when PageDown pages', async () => {
+    host.arrowKeys.set(true);
+    await layout();
+    await settle();
+    cells()[5]!.focus();
+    press('PageDown');
+    await settle();
+    expect(focused()).toBe('Entity 17');
+    // The last page has 6 cards: focus clamps to the last one.
+    press('PageDown');
+    await settle();
+    expect(focused()).toBe('Entity 29');
+  });
+
+  it('turns off when the input does: no tab stops left', async () => {
+    host.arrowKeys.set(true);
+    await layout();
+    await settle();
+    expect(tabStops()).toEqual(['Entity 0']);
+    host.arrowKeys.set(false);
+    await settle();
+    expect(cells().some((cell) => cell.hasAttribute('tabindex'))).toBe(false);
   });
 });

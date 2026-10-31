@@ -534,3 +534,149 @@ describe('mountItemsGrid — update() when app code throws mid-update', () => {
     expect(grid.controller.getState().pageIndex).toBe(0);
   });
 });
+
+describe('mountItemsGrid — arrowKeys', () => {
+  /** MutationObserver callbacks run as microtasks after the DOM changes. */
+  const settle = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+  const press = (target: Element, key: string): KeyboardEvent => {
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+    target.dispatchEvent(event);
+    return event;
+  };
+  const focused = (): string => (document.activeElement as HTMLElement | null)?.textContent ?? '';
+  const tabStops = (): string[] =>
+    cells()
+      .filter(cell => cell.getAttribute('tabindex') === '0')
+      .map(cell => cell.textContent ?? '');
+  const withButton = (item: Entity): HTMLElement => {
+    const card = document.createElement('article');
+    card.append(item.name);
+    const action = document.createElement('button');
+    action.type = 'button';
+    action.textContent = '';
+    action.setAttribute('aria-label', `Open ${item.name}`);
+    card.append(action);
+    return card;
+  };
+
+  it('is off by default: cards are not tab stops and arrows do nothing', async () => {
+    mount();
+    layout();
+    await settle();
+    expect(cells().some(cell => cell.hasAttribute('tabindex'))).toBe(false);
+    expect(press(cells()[0]!, 'ArrowRight').defaultPrevented).toBe(false);
+  });
+
+  it('makes one card the tab stop and moves focus with the arrow keys, Home and End', async () => {
+    mount({ arrowKeys: true });
+    layout();
+    await settle();
+    expect(tabStops()).toEqual(['Entity 0']);
+    expect(cells().filter(cell => cell.getAttribute('tabindex') === '-1')).toHaveLength(11);
+    cells()[0]!.focus();
+    expect(press(cells()[0]!, 'ArrowRight').defaultPrevented).toBe(true);
+    expect(focused()).toBe('Entity 1');
+    expect(tabStops()).toEqual(['Entity 1']);
+    press(document.activeElement!, 'ArrowDown');
+    expect(focused()).toBe('Entity 5');
+    press(document.activeElement!, 'End');
+    expect(focused()).toBe('Entity 11');
+    press(document.activeElement!, 'Home');
+    expect(focused()).toBe('Entity 0');
+  });
+
+  it('crosses pages with the arrows and focuses the matching card', async () => {
+    mount({ arrowKeys: true });
+    layout();
+    await settle();
+    cells()[11]!.focus();
+    press(cells()[11]!, 'ArrowRight');
+    await settle();
+    expect(texts()[0]).toBe('Entity 12');
+    expect(focused()).toBe('Entity 12');
+    press(document.activeElement!, 'ArrowRight');
+    press(document.activeElement!, 'ArrowUp');
+    await settle();
+    // Column 1 of the bottom row of page 1.
+    expect(focused()).toBe('Entity 9');
+    expect(tabStops()).toEqual(['Entity 9']);
+  });
+
+  it('keeps focus on the card at the same position when PageDown pages', async () => {
+    mount({ arrowKeys: true });
+    layout();
+    await settle();
+    cells()[5]!.focus();
+    press(cells()[5]!, 'PageDown');
+    await settle();
+    expect(focused()).toBe('Entity 17');
+    // The last page has 6 cards: focus clamps to the last one.
+    press(document.activeElement!, 'PageDown');
+    await settle();
+    expect(focused()).toBe('Entity 29');
+  });
+
+  it("leaves keys inside a card's controls alone; Escape returns to the card", async () => {
+    mount({ arrowKeys: true, renderItem: withButton });
+    layout();
+    await settle();
+    const action = button('Open Entity 3');
+    action.focus();
+    // Reaching a card's control with Tab makes that card the arrow start.
+    expect(tabStops()).toEqual(['Entity 3']);
+    expect(press(action, 'ArrowRight').defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(action);
+    press(action, 'Escape');
+    expect(document.activeElement).toBe(cells()[3]!);
+  });
+
+  it('waits for server cards before focusing, and not if focus moved elsewhere meanwhile', async () => {
+    const grid = mount({
+      arrowKeys: true,
+      mode: 'server',
+      items: entities(12),
+      total: 60,
+      renderSkeleton: () => document.createElement('div'),
+    });
+    layout();
+    await settle();
+    cells()[2]!.focus();
+    press(cells()[2]!, 'PageDown');
+    grid.update({ loading: true });
+    await settle();
+    grid.update({ loading: false, items: entities(24).slice(12) });
+    await settle();
+    expect(focused()).toBe('Entity 14');
+
+    press(document.activeElement!, 'PageDown');
+    grid.update({ loading: true });
+    await settle();
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    outside.focus();
+    grid.update({ loading: false, items: entities(36).slice(24) });
+    await settle();
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
+  });
+
+  it('swaps left and right in a right-to-left layout', async () => {
+    mount({ arrowKeys: true });
+    viewport().style.direction = 'rtl';
+    layout();
+    await settle();
+    cells()[0]!.focus();
+    press(cells()[0]!, 'ArrowLeft');
+    expect(focused()).toBe('Entity 1');
+  });
+
+  it('turns off with update(): no tab stops left, arrows do nothing', async () => {
+    const grid = mount({ arrowKeys: true });
+    layout();
+    await settle();
+    grid.update({ arrowKeys: false });
+    await settle();
+    expect(cells().some(cell => cell.hasAttribute('tabindex'))).toBe(false);
+    expect(press(cells()[0]!, 'ArrowRight').defaultPrevented).toBe(false);
+  });
+});

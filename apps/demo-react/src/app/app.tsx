@@ -43,6 +43,7 @@ export function App(): ReactElement {
   const [align, setAlign] = useState<GridAlign>('start');
   const [maxPage, setMaxPage] = useState<MaxPageChoice>('fit');
   const [realtime, setRealtime] = useState(false);
+  const [arrowKeys, setArrowKeys] = useState(true);
   const [server, setServer] = useState<ServerPage>(NO_PAGE);
   const [pendingCount, setPendingCount] = useState(0);
   const [loadError, setLoadError] = useState(false);
@@ -177,6 +178,14 @@ export function App(): ReactElement {
             />
             Realtime
           </label>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={arrowKeys}
+              onChange={event => setArrowKeys(event.target.checked)}
+            />
+            Arrow keys
+          </label>
         </div>
         <ItemsGrid<Entity>
           ref={grid}
@@ -191,6 +200,7 @@ export function App(): ReactElement {
           reflow={reflow}
           align={align}
           maxPageSize={maxPageSizeOf(maxPage)}
+          arrowKeys={arrowKeys}
           onPageRequest={onPageRequest}
           onStateChange={state => setPendingCount(state.pendingCount)}
           renderItem={entity => <Card entity={entity} size={density} onToggle={toggle} />}

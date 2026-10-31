@@ -49,6 +49,7 @@ Additional props:
 | `renderEmpty`        | `() => ReactNode`, rendered over the viewport while `state.isEmpty` (a known total of 0).                                                       |
 | `pager`              | `true` (default), `false`, or `({ state, controller }) => ReactNode` for your own.                                                              |
 | `pagerLabels`        | Localized pager texts.                                                                                                                          |
+| `arrowKeys`          | `true` lets arrow keys, Home and End move focus between cards (default `false`); see the core README.                                           |
 | `aria-label`         | Accessible name of the card list.                                                                                                               |
 | `className`, `style` | Applied to the host element.                                                                                                                    |
 

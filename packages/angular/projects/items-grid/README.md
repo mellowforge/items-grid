@@ -73,7 +73,9 @@ error instead).
 **Inputs** mirror the core options (see the core README): `items`, `getKey` (required),
 `mode`, `total`, `preset`, `presets`, `measureRowHeight`, `sampleItem`, `maxColumns`,
 `maxPageSize`, `reflow`, `align`, `loading`, `pageIndex`, `requestDebounceMs`, `messages`,
-plus `pager` (default `true`), `pagerLabels` and `ariaLabel`. Invalid values throw an
+plus `pager` (default `true`), `pagerLabels`, `ariaLabel` and `arrowKeys` (default `false`:
+arrow keys, Home and End move focus between cards — see the "Arrow keys" section of the
+`@mellowforge/items-grid-core` README). Invalid values throw an
 `items-grid:` error from the options effect (so they reach Angular's `ErrorHandler`) and the
 previous options stay in place.
 

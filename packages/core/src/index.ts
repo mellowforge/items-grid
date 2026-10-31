@@ -31,8 +31,10 @@ export {
   resolvePreset,
   type DefaultPresetName,
 } from './engine/presets';
+export { getCardMove, type CardGrid, type CardMove } from './engine/navigation';
 export type { GridGeometry, ItemKey, ItemRange, SizePreset, ViewportSize } from './engine/types';
 export { DEFAULT_PAGER_LABELS, type PagerLabels, resolvePagerLabels } from './pager';
+export { attachCardNavigation } from './dom/card-navigation';
 export { isEditableTarget, shouldPageGrid } from './dom/keyboard';
 export { observeSize, type ObserveSizeOptions } from './dom/observe';
 export {

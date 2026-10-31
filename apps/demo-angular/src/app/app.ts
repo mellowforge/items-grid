@@ -109,6 +109,14 @@ const NO_PAGE: ServerPage = { ids: [], total: undefined, loading: true };
           />
           Realtime
         </label>
+        <label class="toggle">
+          <input
+            type="checkbox"
+            [checked]="arrowKeys()"
+            (change)="arrowKeys.set($any($event.target).checked)"
+          />
+          Arrow keys
+        </label>
       </div>
       <mf-items-grid
         class="app__grid"
@@ -122,6 +130,7 @@ const NO_PAGE: ServerPage = { ids: [], total: undefined, loading: true };
         [reflow]="reflow()"
         [align]="align()"
         [maxPageSize]="maxPageSize()"
+        [arrowKeys]="arrowKeys()"
         (pageRequest)="onPageRequest($event)"
         (stateChange)="onStateChange($event)"
       >
@@ -170,6 +179,7 @@ export class App {
   protected readonly maxPage = signal<MaxPageChoice>('fit');
   protected readonly maxPageSize = computed(() => maxPageSizeOf(this.maxPage()));
   protected readonly realtime = signal(false);
+  protected readonly arrowKeys = signal(true);
   protected readonly server = signal<ServerPage>(NO_PAGE);
   protected readonly pendingCount = signal(0);
   protected readonly loadError = signal(false);
