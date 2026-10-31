@@ -3,11 +3,12 @@
  * Packs every publishable package exactly as `pnpm publish` would (honouring
  * `publishConfig.directory` for @mellowforge/items-grid-angular) and checks each tarball:
  * required files present, no sources or specs, no `workspace:` specifier left
- * in the packed package.json, and type declarations that resolve for every
- * consumer (arethetypeswrong). Run after `pnpm build`.
+ * in the packed package.json, a LICENSE byte-identical to the root one, and
+ * type declarations that resolve for every consumer (arethetypeswrong).
+ * Run after `pnpm build`.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -35,6 +36,8 @@ const PACKAGES = [
 const ALWAYS = ['package.json', 'README.md', 'LICENSE'];
 const FORBIDDEN = [/^src\//, /\.spec\./, /^tsconfig/, /CLAUDE\.md$/];
 
+const ROOT_LICENSE = readFileSync('LICENSE');
+
 const destination = mkdtempSync(join(tmpdir(), 'items-grid-pack-'));
 let failures = 0;
 
@@ -57,6 +60,10 @@ try {
     const manifest = execFileSync('tar', ['-xOf', filename, 'package/package.json'], {
       encoding: 'utf8',
     });
+    if (paths.includes('LICENSE')) {
+      const license = execFileSync('tar', ['-xOf', filename, 'package/LICENSE']);
+      if (!license.equals(ROOT_LICENSE)) problems.push('LICENSE differs from the root LICENSE');
+    }
     for (const [field, deps] of Object.entries(JSON.parse(manifest))) {
       if (!field.toLowerCase().includes('dependencies') || typeof deps !== 'object') continue;
       for (const [dep, range] of Object.entries(deps)) {

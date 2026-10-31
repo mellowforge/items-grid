@@ -1,4 +1,4 @@
-# Keeps the SHA-pinned third-party actions in .github/workflows current.
+# Keeps every action in .github/workflows current: the SHA pins and their `# vX.Y.Z` comments.
 version: 2
 updates:
   - package-ecosystem: github-actions

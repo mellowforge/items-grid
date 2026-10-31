@@ -23,7 +23,7 @@ export default defineConfig(
         'error',
         { type: 'attribute', prefix: 'mf', style: 'camelCase' },
       ],
-      // The library exports `MfItemsGrid`, not `MfItemsGridComponent` (same as treekit).
+      // The library exports `MfItemsGrid`, not `MfItemsGridComponent`.
       '@angular-eslint/component-class-suffix': 'off',
       '@angular-eslint/directive-class-suffix': 'off',
       // `ngTemplateContextGuard` must declare parameters it never reads.

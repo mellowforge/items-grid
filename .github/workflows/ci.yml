@@ -17,12 +17,12 @@ jobs:
     name: Format, build, lint, test, package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # pnpm version comes from "packageManager" in package.json.
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -44,12 +44,9 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
-      - name: LICENSE parity
-        # npm only packs files inside the package, so each package carries a copy of the root LICENSE.
-        run: |
-          for copy in packages/core/LICENSE packages/react/LICENSE packages/angular/projects/items-grid/LICENSE; do
-            cmp LICENSE "$copy" || { echo "::error file=$copy::$copy differs from the root LICENSE"; exit 1; }
-          done
+      - name: Agent hook tests
+        run: pnpm test:hooks
 
       - name: Inspect package contents
+        # Also checks that each tarball's LICENSE is byte-identical to the root LICENSE.
         run: pnpm pack:check

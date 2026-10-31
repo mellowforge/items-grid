@@ -14,8 +14,9 @@
     "format:check": "prettier --check .",
     "changeset": "changeset",
     "version-packages": "changeset version && pnpm install --lockfile-only",
-    "release": "pnpm build && pnpm test && pnpm pack:check && changeset publish",
-    "pack:check": "node scripts/pack-check.mjs"
+    "release": "pnpm format:check && pnpm build && pnpm lint && pnpm typecheck && pnpm test && pnpm test:hooks && pnpm pack:check && changeset publish",
+    "pack:check": "node scripts/pack-check.mjs",
+    "test:hooks": "node --test .claude/hooks/block-raw-tooling.test.js"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",

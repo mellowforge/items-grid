@@ -19,8 +19,8 @@ apps/demo-react, apps/demo-angular  source-linked mirrors of each other
 
 ## Commands
 
-- `pnpm build` (core → react → angular → apps), `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm pack:check`.
-- Scoped: `pnpm --filter @mellowforge/items-grid-core exec vitest run src/controller.spec.ts -t '<name>'`; Angular: `cd packages/angular && pnpm ng test --watch=false`.
+- `pnpm build` (core → react → angular → apps), `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm pack:check`, `pnpm test:hooks`.
+- Scoped: `pnpm --filter @mellowforge/items-grid-core exec vitest run src/controller.spec.ts -t '<name>'`; Angular: `cd packages/angular && pnpm ng test --watch=false` (one spec: `--include lib/items-grid.spec.ts`, relative to the library source root).
 - Adapters, `demo-vanilla` and the Angular library resolve core from `packages/core/dist` — **build core first** after changing it.
 
 ## Architecture invariants
@@ -43,6 +43,6 @@ apps/demo-react, apps/demo-angular  source-linked mirrors of each other
 - TDD: write the failing spec, watch it fail for the right reason, then implement. A new adapter scenario goes into **both** adapter specs.
 - User-visible package changes need a changeset (packages are versioned together) and README updates.
 - Run the review gate in `.claude/rules/review-gate.md` per chunk. Deferred work goes to `BACKLOG.md`.
-- Never publish to npm or push tags (`.claude/hooks/block-raw-tooling.js` blocks the publish commands, npm/yarn installs and bare `vitest` in the Angular workspace); never commit to `main` directly. Releases: `.claude/rules/release.md`.
+- Never publish to npm or push tags; never commit to `main` directly. `.claude/hooks/block-raw-tooling.js` blocks publishing, tag pushes, npm installs, yarn and direct `vitest` in the Angular workspace (tests: `pnpm test:hooks`). Releases: `.claude/rules/release.md`.
 
 @.claude/rules/review-gate.md

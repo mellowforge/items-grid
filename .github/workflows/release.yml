@@ -9,10 +9,10 @@ name: Release
 #
 # Auth: npm trusted publishing (OIDC) — no npm token is stored anywhere. Each package's trusted
 # publisher on npmjs.com (package → Settings → Trusted Publisher) must name GitHub owner
-# "mellowforge", repository "items-grid", workflow file "release.yml", no environment, and allow
-# direct publishing. changesets/action skips writing an .npmrc when OIDC is available, and pnpm
-# performs the OIDC exchange itself. Trusted publishers can only be added to packages that already
-# exist, so the very first version of each package is published by hand — see
+# "mellowforge", repository "items-grid", workflow file "release.yml" and no environment, with
+# direct publishing allowed. changesets/action skips writing an .npmrc when OIDC is available, and
+# pnpm performs the OIDC exchange itself. Trusted publishers can only be added to packages that
+# already exist, so the very first version of each package is published by hand — see
 # .claude/rules/release.md.
 
 on:
@@ -28,14 +28,16 @@ permissions:
 
 jobs:
   release:
+    # Forks never open Version PRs or attempt to publish.
+    if: github.repository == 'mellowforge/items-grid'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # pnpm version comes from "packageManager" in package.json.
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           package-manager-cache: false # npm's guidance: never cache dependencies in release builds
