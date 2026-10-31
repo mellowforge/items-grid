@@ -25,8 +25,12 @@
   --idle-bg: #f2f4f7;
   --idle-dot: #98a2b3;
   --skeleton: #eaecf0;
+  --skeleton-shine: #f4f5f7;
+  --on-accent: #ffffff;
+  --shadow: rgb(16 24 40 / 0.08);
   --radius: 10px;
-  color-scheme: light;
+  /* Follows the OS; the library pager follows the same color-scheme. */
+  color-scheme: light dark;
   font-family:
     Inter,
     ui-sans-serif,
@@ -41,6 +45,34 @@
   --mf-items-grid-pager-current-color: var(--accent);
   --mf-items-grid-pager-current-background: var(--accent-soft);
   --mf-items-grid-focus-ring: var(--accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c111d;
+    --surface: #161b26;
+    --border: #333741;
+    --text: #f5f5f6;
+    --text-muted: #94969c;
+    --accent: #a4bcfd;
+    --accent-soft: #1f235b;
+    --ok: #75e0a7;
+    --ok-bg: #053321;
+    --ok-dot: #17b26a;
+    --warn: #fec84b;
+    --warn-bg: #4e1d09;
+    --warn-dot: #f79009;
+    --error: #fda29b;
+    --error-bg: #55160c;
+    --error-dot: #f04438;
+    --idle: #cecfd2;
+    --idle-bg: #22262f;
+    --idle-dot: #85888e;
+    --skeleton: #22262f;
+    --skeleton-shine: #2c313c;
+    --on-accent: #0c111d;
+    --shadow: rgb(0 0 0 / 0.4);
+  }
 }
 
 *,
@@ -161,7 +193,7 @@ body {
   background: var(--surface);
   color: var(--text);
   font-weight: 600;
-  box-shadow: 0 1px 2px rgb(16 24 40 / 0.08);
+  box-shadow: 0 1px 2px var(--shadow);
 }
 
 .segmented__option:focus-visible,
@@ -200,7 +232,7 @@ body {
   border: 0;
   border-radius: 999px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -456,7 +488,7 @@ body {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface);
   transition: transform 120ms;
 }
 
@@ -494,7 +526,12 @@ body {
 .skeleton-card__bar {
   height: 10px;
   border-radius: 5px;
-  background: linear-gradient(90deg, var(--skeleton) 0%, #f4f5f7 50%, var(--skeleton) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--skeleton) 0%,
+    var(--skeleton-shine) 50%,
+    var(--skeleton) 100%
+  );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }

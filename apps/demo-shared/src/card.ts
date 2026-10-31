@@ -60,5 +60,19 @@ export const ALIGN_OPTIONS = [
   { value: 'center', label: 'Center' },
 ] as const;
 
+/** `maxPageSize` choices: fit the screen, or cap the page (full rows are kept). */
+export const MAX_PAGE_OPTIONS = [
+  { value: 'fit', label: 'Fit' },
+  { value: '8', label: '8' },
+  { value: '16', label: '16' },
+] as const;
+
+export type MaxPageChoice = (typeof MAX_PAGE_OPTIONS)[number]['value'];
+
+/** The `maxPageSize` option for a toolbar choice; `undefined` fits the screen. */
+export function maxPageSizeOf(choice: MaxPageChoice): number | undefined {
+  return choice === 'fit' ? undefined : Number(choice);
+}
+
 /** Size of the demo dataset. */
 export const DEMO_ITEM_COUNT = 120;

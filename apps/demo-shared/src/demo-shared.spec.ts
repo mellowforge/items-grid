@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { cardView } from './card';
+import { cardView, MAX_PAGE_OPTIONS, maxPageSizeOf } from './card';
 import { createEntities, createRandom } from './entities';
 import { fetchPage } from './server';
 import { tick } from './simulation';
 
 describe('demo fixtures', () => {
+  it('maps the Max choices to maxPageSize', () => {
+    expect(MAX_PAGE_OPTIONS.map(option => maxPageSizeOf(option.value))).toEqual([undefined, 8, 16]);
+  });
+
   it('creates the same dataset for every demo', () => {
     expect(createEntities(8)).toEqual(createEntities(8));
     expect(new Set(createEntities(120).map(entity => entity.id)).size).toBe(120);

@@ -20,6 +20,9 @@ import {
   DENSITY_OPTIONS,
   type Entity,
   fetchPage,
+  MAX_PAGE_OPTIONS,
+  type MaxPageChoice,
+  maxPageSizeOf,
   MODE_OPTIONS,
   type PageResponse,
   REFLOW_OPTIONS,
@@ -92,6 +95,12 @@ const NO_PAGE: ServerPage = { ids: [], total: undefined, loading: true };
           [value]="align()"
           (valueChange)="align.set($event)"
         />
+        <app-segmented
+          label="Max"
+          [options]="maxPageOptions"
+          [value]="maxPage()"
+          (valueChange)="maxPage.set($event)"
+        />
         <label class="toggle">
           <input
             type="checkbox"
@@ -112,6 +121,7 @@ const NO_PAGE: ServerPage = { ids: [], total: undefined, loading: true };
         [preset]="density()"
         [reflow]="reflow()"
         [align]="align()"
+        [maxPageSize]="maxPageSize()"
         (pageRequest)="onPageRequest($event)"
         (stateChange)="onStateChange($event)"
       >
@@ -150,12 +160,15 @@ export class App {
   protected readonly modeOptions = MODE_OPTIONS;
   protected readonly reflowOptions = REFLOW_OPTIONS;
   protected readonly alignOptions = ALIGN_OPTIONS;
+  protected readonly maxPageOptions = MAX_PAGE_OPTIONS;
 
   protected readonly database = signal(createEntities(DEMO_ITEM_COUNT));
   protected readonly density = signal<CardSize>('normal');
   protected readonly mode = signal<PagingMode>('client');
   protected readonly reflow = signal<ReflowMode>('live');
   protected readonly align = signal<GridAlign>('start');
+  protected readonly maxPage = signal<MaxPageChoice>('fit');
+  protected readonly maxPageSize = computed(() => maxPageSizeOf(this.maxPage()));
   protected readonly realtime = signal(false);
   protected readonly server = signal<ServerPage>(NO_PAGE);
   protected readonly pendingCount = signal(0);

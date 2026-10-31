@@ -14,6 +14,9 @@ import {
   DENSITY_OPTIONS,
   type Entity,
   fetchPage,
+  MAX_PAGE_OPTIONS,
+  type MaxPageChoice,
+  maxPageSizeOf,
   MODE_OPTIONS,
   type PageResponse,
   REFLOW_OPTIONS,
@@ -38,6 +41,7 @@ export function App(): ReactElement {
   const [mode, setMode] = useState<PagingMode>('client');
   const [reflow, setReflow] = useState<ReflowMode>('live');
   const [align, setAlign] = useState<GridAlign>('start');
+  const [maxPage, setMaxPage] = useState<MaxPageChoice>('fit');
   const [realtime, setRealtime] = useState(false);
   const [server, setServer] = useState<ServerPage>(NO_PAGE);
   const [pendingCount, setPendingCount] = useState(0);
@@ -164,6 +168,7 @@ export function App(): ReactElement {
           <Segmented label="Data" options={MODE_OPTIONS} value={mode} onChange={changeMode} />
           <Segmented label="Updates" options={REFLOW_OPTIONS} value={reflow} onChange={setReflow} />
           <Segmented label="Align" options={ALIGN_OPTIONS} value={align} onChange={setAlign} />
+          <Segmented label="Max" options={MAX_PAGE_OPTIONS} value={maxPage} onChange={setMaxPage} />
           <label className="toggle">
             <input
               type="checkbox"
@@ -185,6 +190,7 @@ export function App(): ReactElement {
           preset={density}
           reflow={reflow}
           align={align}
+          maxPageSize={maxPageSizeOf(maxPage)}
           onPageRequest={onPageRequest}
           onStateChange={state => setPendingCount(state.pendingCount)}
           renderItem={entity => <Card entity={entity} size={density} onToggle={toggle} />}

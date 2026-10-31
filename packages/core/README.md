@@ -171,6 +171,12 @@ placed outside the grid. Class hooks: `mf-items-grid`, `mf-items-grid__viewport`
 `__cell--skeleton`, `__empty`, `__probe`, `__live`, `mf-items-grid-pager`, `__status`,
 `__list`, `__button`, `__gap`.
 
+Dark mode needs no setup: the pager's colours derive from `currentColor`, and its accent
+follows the page's `color-scheme` through `light-dark()` — declare `color-scheme: light dark`
+(or `dark`) and the current page and focus ring switch to a lighter indigo. Browsers without
+`light-dark()` keep the light accent; set `--mf-items-grid-pager-current-color` and
+`--mf-items-grid-focus-ring` to override it either way.
+
 ## License
 
 MIT

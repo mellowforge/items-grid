@@ -18,6 +18,9 @@ import {
   DENSITY_OPTIONS,
   type Entity,
   fetchPage,
+  MAX_PAGE_OPTIONS,
+  type MaxPageChoice,
+  maxPageSizeOf,
   MODE_OPTIONS,
   REFLOW_OPTIONS,
   startSimulation,
@@ -30,6 +33,7 @@ let density: CardSize = 'normal';
 let mode: PagingMode = 'client';
 let reflow: ReflowMode = 'live';
 let align: GridAlign = 'start';
+let maxPage: MaxPageChoice = 'fit';
 let serverIds: string[] = [];
 let serverTotal: number | undefined;
 let loading = false;
@@ -241,6 +245,7 @@ toolbar.append(
   segmented('Data', MODE_OPTIONS, () => mode, setMode),
   segmented('Updates', REFLOW_OPTIONS, () => reflow, setReflow),
   segmented('Align', ALIGN_OPTIONS, () => align, setAlign),
+  segmented('Max', MAX_PAGE_OPTIONS, () => maxPage, setMaxPage),
   realtimeLabel
 );
 const gridHost = element('section', 'app__grid');
@@ -358,6 +363,11 @@ function setReflow(value: ReflowMode): void {
 function setAlign(value: GridAlign): void {
   align = value;
   grid.update({ align: value });
+}
+
+function setMaxPage(value: MaxPageChoice): void {
+  maxPage = value;
+  grid.update({ maxPageSize: maxPageSizeOf(value) });
 }
 
 realtimeInput.addEventListener('change', () => {
