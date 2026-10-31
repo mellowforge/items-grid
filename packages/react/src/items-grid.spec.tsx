@@ -474,6 +474,21 @@ describe('ItemsGrid — arrowKeys', () => {
     expect(focused()).toBe('Entity 29');
   });
 
+  it('moves focus to the same position when a resize or an update removes the focused card', async () => {
+    const { rerender } = render(<Grid arrowKeys />);
+    layout();
+    await settle();
+    act(() => cells()[11]!.focus());
+    // 3 × 3 = 9 per page, anchored on Entity 0: Entity 11 leaves the page.
+    layout(976, 552);
+    await settle();
+    expect(focused()).toBe('Entity 8');
+    rerender(<Grid arrowKeys items={entities(30).filter(item => item.id !== 8)} />);
+    await settle();
+    expect(focused()).toBe('Entity 9');
+    expect(tabStops()).toEqual(['Entity 9']);
+  });
+
   it('turns off when the prop does, and detaches under StrictMode remounts', async () => {
     const { rerender } = render(
       <StrictMode>

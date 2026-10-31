@@ -670,6 +670,72 @@ describe('mountItemsGrid — arrowKeys', () => {
     expect(focused()).toBe('Entity 1');
   });
 
+  it('moves focus to the same position when a resize drops the focused card from the page', async () => {
+    mount({ arrowKeys: true });
+    layout();
+    await settle();
+    cells()[11]!.focus();
+    // 3 × 3 = 9 per page, anchored on Entity 0: Entity 11 leaves the page.
+    layout(976, 552);
+    await settle();
+    expect(focused()).toBe('Entity 8');
+    expect(tabStops()).toEqual(['Entity 8']);
+  });
+
+  it('keeps focus on a card that stays on the page after a resize', async () => {
+    mount({ arrowKeys: true });
+    layout();
+    await settle();
+    const card = cells()[2]!;
+    card.focus();
+    layout(976, 552);
+    await settle();
+    expect(document.activeElement).toBe(card);
+  });
+
+  it('moves focus to the card now at that position when a realtime update removes the focused one', async () => {
+    const grid = mount({ arrowKeys: true });
+    layout();
+    await settle();
+    cells()[5]!.focus();
+    grid.update({ items: entities(30).filter(item => item.id !== 5) });
+    await settle();
+    expect(focused()).toBe('Entity 6');
+  });
+
+  it('does not pull focus back when it left the grid before the card was removed', async () => {
+    const grid = mount({ arrowKeys: true });
+    layout();
+    await settle();
+    cells()[5]!.focus();
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    outside.focus();
+    grid.update({ items: entities(30).filter(item => item.id !== 5) });
+    await settle();
+    expect(document.activeElement).toBe(outside);
+
+    cells()[3]!.focus();
+    (document.activeElement as HTMLElement).blur();
+    // The user's blur and the data update are separate tasks.
+    await settle();
+    grid.update({ items: entities(30).filter(item => item.id !== 3 && item.id !== 5) });
+    await settle();
+    expect(document.activeElement).toBe(document.body);
+    outside.remove();
+  });
+
+  it('keeps the tab stop on the focused card when an insertion shifts it', async () => {
+    const grid = mount({ arrowKeys: true });
+    layout();
+    await settle();
+    cells()[5]!.focus();
+    grid.update({ items: [{ id: 100, name: 'New' }, ...entities(30)] });
+    await settle();
+    expect(focused()).toBe('Entity 5');
+    expect(tabStops()).toEqual(['Entity 5']);
+  });
+
   it('turns off with update(): no tab stops left, arrows do nothing', async () => {
     const grid = mount({ arrowKeys: true });
     layout();

@@ -1,16 +1,18 @@
 import type { ItemsGridHandle } from '../controller';
 import { getCardMove } from '../engine/navigation';
 
-type NavigationHandle = Pick<ItemsGridHandle<unknown>, 'getState' | 'next' | 'prev' | 'subscribe'>;
+type NavigationHandle = Pick<ItemsGridHandle<unknown>, 'getState' | 'next' | 'prev'>;
 
 /**
  * Opt-in arrow-key navigation between the cards of a grid viewport (`arrowKeys`). One card
  * at a time is a tab stop (roving `tabindex`); with focus on a card itself, the arrows move
  * between cards — across pages at the edges — and Home / End jump to the first / last card
  * on the page. Keys pressed inside a card's own controls are left to them; Escape there
- * returns focus to the card. When the grid pages from the keyboard (arrows, PageUp /
- * PageDown), focus moves to the card at the same position on the new page once its cards
- * render — unless focus has gone elsewhere by then.
+ * returns focus to the card. When the focused card leaves the DOM — the page changed (PageUp
+ * / PageDown, a resize that reanchors) or a realtime update removed it — focus moves to the
+ * card now at the same position (in server mode once the page's cards arrive); arrows that
+ * cross a page land on the first card or the same column. Focus the user moved elsewhere is
+ * never pulled back.
  *
  * Renderer-agnostic: it finds the cards as the viewport's `role="listitem"` children and
  * follows them with a `MutationObserver`, so React, Angular and the vanilla mount share it.
@@ -21,15 +23,14 @@ type NavigationHandle = Pick<ItemsGridHandle<unknown>, 'getState' | 'next' | 'pr
 export function attachCardNavigation(viewport: HTMLElement, grid: NavigationHandle): () => void {
   /** The tab stop's offset on the page. */
   let active = 0;
-  /** Offset to focus once the next page's cards render. */
+  /** Offset to focus once the page's cards render. */
   let pending: number | null = null;
   /**
-   * A PageUp / PageDown pressed in a card, until its event is done: the adapter's own key
-   * handler pages (before or after this one, depending on the renderer), and if the page
-   * changes meanwhile, focus follows to the same spot.
+   * The card holding focus and its offset, until focus really leaves the grid. Browsers fire
+   * no focusout when the focused node is removed, so a disconnected `cell` here means the
+   * renderer removed it while it had focus.
    */
-  let paging: { offset: number; pageIndex: number } | null = null;
-  let pagingTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastFocus: { cell: HTMLElement; offset: number } | null = null;
 
   const cards = (): HTMLElement[] =>
     Array.from(viewport.children).filter(
@@ -51,8 +52,18 @@ export function attachCardNavigation(viewport: HTMLElement, grid: NavigationHand
 
   function onMutation(): void {
     const list = cards();
+    const focus = document.activeElement;
+    const inside = cardOf(focus, list);
+    if (inside >= 0) {
+      // Insertions and removals around the focused card shift its offset.
+      active = inside;
+      lastFocus = { cell: list[inside]!, offset: inside };
+    } else if (lastFocus && !lastFocus.cell.isConnected) {
+      const dropped = !focus || focus === document.body;
+      if (pending === null && dropped) pending = lastFocus.offset;
+      lastFocus = null;
+    }
     if (pending !== null && list.length > 0) {
-      const focus = document.activeElement;
       const free = !focus || focus === document.body || viewport.contains(focus);
       const target = pending;
       pending = null;
@@ -99,42 +110,38 @@ export function attachCardNavigation(viewport: HTMLElement, grid: NavigationHand
     }
   }
 
-  function onPagingKey(event: KeyboardEvent): void {
-    if (event.key !== 'PageDown' && event.key !== 'PageUp') return;
-    const offset = cardOf(event.composedPath?.()[0] ?? event.target, cards());
-    if (offset < 0) return;
-    paging = { offset, pageIndex: grid.getState().pageIndex };
-    clearTimeout(pagingTimer);
-    pagingTimer = setTimeout(() => (paging = null), 0);
-  }
-
-  function onStateChange(): void {
-    if (paging && grid.getState().pageIndex !== paging.pageIndex) {
-      pending = paging.offset;
-      paging = null;
-    }
-  }
-
   function onFocusin(event: FocusEvent): void {
     const list = cards();
     const offset = cardOf(event.target, list);
-    if (offset >= 0 && offset !== active) {
+    if (offset < 0) return;
+    lastFocus = { cell: list[offset]!, offset };
+    if (offset !== active) {
       active = offset;
       syncTabStops(list);
     }
   }
 
   function onFocusout(event: FocusEvent): void {
-    // Focus leaving for somewhere else on the page cancels a pending move.
     const next = event.relatedTarget;
-    if (next instanceof Node && !viewport.contains(next)) pending = null;
+    if (next instanceof Node && viewport.contains(next)) return;
+    const left = (): void => {
+      lastFocus = null;
+      pending = null;
+    };
+    // Focus moved somewhere else on the page: forget it. Blurred to nothing: only if the
+    // element is still there (a removed one is the renderer's doing, not the user's).
+    if (next instanceof Node) left();
+    else {
+      const target = event.target;
+      queueMicrotask(() => {
+        if (target instanceof Node && target.isConnected) left();
+      });
+    }
   }
 
   const observer =
     typeof MutationObserver === 'undefined' ? null : new MutationObserver(onMutation);
   observer?.observe(viewport, { childList: true });
-  const unsubscribe = grid.subscribe(onStateChange);
-  viewport.addEventListener('keydown', onPagingKey, true);
   viewport.addEventListener('keydown', onKeydown);
   viewport.addEventListener('focusin', onFocusin);
   viewport.addEventListener('focusout', onFocusout);
@@ -142,9 +149,6 @@ export function attachCardNavigation(viewport: HTMLElement, grid: NavigationHand
 
   return () => {
     observer?.disconnect();
-    unsubscribe();
-    clearTimeout(pagingTimer);
-    viewport.removeEventListener('keydown', onPagingKey, true);
     viewport.removeEventListener('keydown', onKeydown);
     viewport.removeEventListener('focusin', onFocusin);
     viewport.removeEventListener('focusout', onFocusout);

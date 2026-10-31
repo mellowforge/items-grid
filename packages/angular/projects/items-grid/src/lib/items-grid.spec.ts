@@ -578,6 +578,21 @@ describe('MfItemsGrid — arrowKeys', () => {
     expect(focused()).toBe('Entity 29');
   });
 
+  it('moves focus to the same position when a resize or an update removes the focused card', async () => {
+    host.arrowKeys.set(true);
+    await layout();
+    await settle();
+    cells()[11]!.focus();
+    // 3 × 3 = 9 per page, anchored on Entity 0: Entity 11 leaves the page.
+    await layout(976, 552);
+    await settle();
+    expect(focused()).toBe('Entity 8');
+    host.items.set(entities(30).filter((item) => item.id !== 8));
+    await settle();
+    expect(focused()).toBe('Entity 9');
+    expect(tabStops()).toEqual(['Entity 9']);
+  });
+
   it('turns off when the input does: no tab stops left', async () => {
     host.arrowKeys.set(true);
     await layout();

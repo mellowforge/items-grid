@@ -181,9 +181,11 @@ enters the grid once and then continues into that card's own controls. With focu
 | Home / End | the first / last card on the page                                                                                                                         |
 
 Keys pressed inside a card's own controls stay theirs; Escape there returns focus to the card.
-Reaching a control with Tab makes its card the arrow start. When the grid pages from the
-keyboard (arrows, PageUp / PageDown), focus moves to the card at the same position on the new
-page — in server mode once its cards arrive — unless focus has gone elsewhere meanwhile. The
+Reaching a control with Tab makes its card the arrow start. When the focused card leaves the
+grid — PageUp / PageDown, a resize that changes the page, a realtime update that removes it —
+focus moves to the card now at the same position (in server mode once the page's cards
+arrive); arrows that cross a page land on its first card or the same column. Focus the user
+moved elsewhere is never pulled back. The
 optional stylesheet draws a `:focus-visible` ring on focused cards (`--mf-items-grid-focus-ring`).
 For your own renderer, `attachCardNavigation(viewport, controller)` does all of this for the
 viewport's `role="listitem"` children and returns a detach function; `getCardMove` is the pure
