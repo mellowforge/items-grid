@@ -702,6 +702,83 @@ describe('mountItemsGrid — arrowKeys', () => {
     expect(tabStops()).toEqual(['Entity 2']);
   });
 
+  it('keeps focus on the control inside a card the renderer moves', async () => {
+    // The same item objects, so the cards keep their content (and the focused button).
+    const items = entities(30);
+    const grid = mount({ arrowKeys: true, renderItem: withButton, items });
+    layout();
+    await settle();
+    const action = button('Open Entity 2');
+    action.focus();
+    grid.update({ items: [items[2]!, items[0]!, items[1]!, ...items.slice(3)] });
+    await settle();
+    expect(document.activeElement).toBe(action);
+  });
+
+  it('does not pull focus back when a focused control was removed and its card moves later', async () => {
+    type Saved = Entity & { saved?: boolean };
+    const grid = mountItemsGrid<Saved>(container, {
+      arrowKeys: true,
+      getKey: item => item.id,
+      items: entities(30),
+      renderItem: item => (item.saved ? document.createElement('article') : withButton(item)),
+    });
+    mounted = grid as unknown as ItemsGridMount<Entity>;
+    layout();
+    await settle();
+    button('Open Entity 2').focus();
+    const items: Saved[] = entities(30);
+    // The card re-renders without its button: focus drops to <body>.
+    const saved = [...items.slice(0, 2), { ...items[2]!, saved: true }, ...items.slice(3)];
+    grid.update({ items: saved });
+    await settle();
+    expect(document.activeElement).toBe(document.body);
+    // Much later, the renderer moves that card.
+    await settle();
+    grid.update({ items: [saved[2]!, saved[0]!, saved[1]!, ...saved.slice(3)] });
+    await settle();
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('inside a shadow root, does not take focus from an outside input while a page loads', async () => {
+    const shadowHost = document.createElement('div');
+    document.body.append(shadowHost);
+    const inner = document.createElement('div');
+    shadowHost.attachShadow({ mode: 'open' }).append(inner);
+    const grid = mountItemsGrid<Entity>(inner, {
+      arrowKeys: true,
+      mode: 'server',
+      items: entities(12),
+      total: 60,
+      getKey: item => item.id,
+      renderItem: item => {
+        const card = document.createElement('article');
+        card.textContent = item.name;
+        return card;
+      },
+      renderSkeleton: () => document.createElement('div'),
+    });
+    const shadowViewport = inner.querySelector<HTMLElement>('.mf-items-grid__viewport')!;
+    ResizeObserverStub.for(shadowViewport).fire(1318, 552);
+    flushFrames();
+    await settle();
+    const shadowCells = (): HTMLElement[] =>
+      Array.from(shadowViewport.querySelectorAll<HTMLElement>('[role="listitem"]'));
+    shadowCells()[11]!.focus();
+    press(shadowCells()[11]!, 'ArrowRight');
+    grid.update({ loading: true });
+    await settle();
+    const search = document.createElement('input');
+    document.body.append(search);
+    search.focus();
+    grid.update({ loading: false, items: entities(24).slice(12) });
+    await settle();
+    expect(document.activeElement).toBe(search);
+    grid.destroy();
+    search.remove();
+    shadowHost.remove();
+  });
+
   it('keeps a tab stop when the page shrinks while focus is outside the grid', async () => {
     const grid = mount({ arrowKeys: true });
     layout();

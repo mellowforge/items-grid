@@ -187,7 +187,7 @@ put. Keys with Alt, Ctrl, Meta or Shift, keys during IME composition and keys a 
 already handled (`preventDefault()`) are left alone; Escape in a card's control returns focus
 to the card. When the focused card leaves the grid — PageUp / PageDown, a resize that changes
 the page, a realtime update that removes it — focus moves to the card now at the same position
-(in server mode once the page's cards arrive); a card that only moves keeps focus, and focus
+(in server mode once the page's cards arrive); a card that only moves keeps focus on whatever in it had focus, and focus
 the user moved elsewhere is never pulled back. The optional stylesheet draws a
 `:focus-visible` ring on focused cards (`--mf-items-grid-focus-ring`).
 

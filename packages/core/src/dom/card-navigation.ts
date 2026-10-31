@@ -35,7 +35,8 @@ const isNode = (value: unknown): value is Node =>
  * When the focused card leaves the DOM — the page changed (PageUp / PageDown, a resize that
  * reanchors) or a realtime update removed it — focus moves to the card now at the same
  * position (in server mode once the page's cards arrive); a card the renderer only moved
- * keeps focus. Focus the user moved elsewhere is never pulled back.
+ * gets focus back on the element inside it that had it. Focus the user moved elsewhere, or
+ * lost with a control removed from a card that stays, is never pulled back.
  *
  * Renderer-agnostic: it finds the cards as the viewport's `role="listitem"` children and
  * follows them with a `MutationObserver`, so React, Angular and the vanilla mount share it.
@@ -51,18 +52,25 @@ export function attachCardNavigation(
   /** Offset to focus once the page's cards render. */
   let pending: number | null = null;
   /**
-   * The card holding focus and its offset, until focus really leaves the grid. Removing or
-   * moving the focused node drops focus to the document: some browsers (Chrome) fire a
-   * focusout without `relatedTarget` for it, others none, so the mutation records decide
-   * whether the renderer or the user moved focus.
+   * The focused element, its card and the card's offset, until focus really leaves the grid.
+   * Removing or moving the focused node drops focus to the document: some browsers (Chrome)
+   * fire a focusout without `relatedTarget` for it, others none, so the mutation records
+   * decide whether the renderer or the user moved focus.
    */
-  let lastFocus: { cell: HTMLElement; offset: number } | null = null;
+  let lastFocus: { element: Element; cell: HTMLElement; offset: number } | null = null;
   let detached = false;
 
-  const root = (): Document | ShadowRoot => viewport.getRootNode() as Document | ShadowRoot;
-  const focusedElement = (): Element | null => root().activeElement ?? null;
-  const isDropped = (focus: Element | null): boolean =>
-    !focus || focus === viewport.ownerDocument.body;
+  /** Focus as seen from the viewport's tree (a shadow root's own active element). */
+  const focusedElement = (): Element | null =>
+    (viewport.getRootNode() as Document | ShadowRoot).activeElement ?? null;
+  /**
+   * Focus fell to the document (nothing on the page holds it). Asked of the document, since
+   * a shadow root reports no active element whenever focus is outside it.
+   */
+  const isDropped = (): boolean => {
+    const focus = viewport.ownerDocument.activeElement;
+    return !focus || focus === viewport.ownerDocument.body;
+  };
   const cards = (): HTMLElement[] =>
     Array.from(viewport.children).filter(
       (child): child is HTMLElement => child.getAttribute('role') === 'listitem'
@@ -89,23 +97,27 @@ export function attachCardNavigation(
     if (inside >= 0) {
       // Insertions and removals around the focused card shift its offset.
       active = inside;
-      lastFocus = { cell: list[inside]!, offset: inside };
+      lastFocus = { element: focus!, cell: list[inside]!, offset: inside };
     } else if (lastFocus) {
-      const { cell, offset } = lastFocus;
+      const { element, cell, offset } = lastFocus;
       const moved = list.indexOf(cell);
-      const touched = records.some(record => Array.from(record.removedNodes).includes(cell));
-      if (moved >= 0 && touched && isDropped(focus)) {
-        // The renderer moved the focused card (removing it blurred it): keep it focused.
-        focusCard(list, moved);
-        return;
-      }
       if (!cell.isConnected) {
-        if (pending === null && isDropped(focus)) pending = offset;
+        // The renderer removed the focused card: focus the one now in its place.
+        if (pending === null && isDropped()) pending = offset;
+        lastFocus = null;
+      } else if (moved >= 0 && cell.contains(element) && isDropped() && touches(records, cell)) {
+        // The renderer moved the focused card (removing it blurred it): restore focus.
+        active = moved;
+        syncTabStops(list);
+        (element as HTMLElement).focus?.();
+        return;
+      } else {
+        // Focus left some other way (e.g. the focused control was removed from its card).
         lastFocus = null;
       }
     }
     if (pending !== null && list.length > 0) {
-      const free = isDropped(focus) || viewport.contains(focus);
+      const free = isDropped() || (isNode(focus) && viewport.contains(focus));
       const target = pending;
       pending = null;
       if (free) {
@@ -115,6 +127,9 @@ export function attachCardNavigation(
     }
     syncTabStops(list);
   }
+
+  const touches = (records: readonly MutationRecord[], cell: HTMLElement): boolean =>
+    records.some(record => Array.from(record.removedNodes).includes(cell));
 
   function handleKeydown(event: KeyboardEvent): void {
     if (detached || event.defaultPrevented || event.isComposing) return;
@@ -157,7 +172,7 @@ export function attachCardNavigation(
     const list = cards();
     const offset = cardOf(event.target, list);
     if (offset < 0) return;
-    lastFocus = { cell: list[offset]!, offset };
+    lastFocus = { element: event.target as Element, cell: list[offset]!, offset };
     if (offset !== active) {
       active = offset;
       syncTabStops(list);
@@ -193,7 +208,8 @@ export function attachCardNavigation(
 
   const observer =
     typeof MutationObserver === 'undefined' ? null : new MutationObserver(onMutation);
-  observer?.observe(viewport, { childList: true });
+  // The subtree too: removing a focused control inside a card must forget that focus.
+  observer?.observe(viewport, { childList: true, subtree: true });
   if (listenToKeys) viewport.addEventListener('keydown', handleKeydown);
   viewport.addEventListener('focusin', onFocusin);
   viewport.addEventListener('focusout', onFocusout);
