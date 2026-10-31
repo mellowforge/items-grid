@@ -1,6 +1,6 @@
 {
   "name": "@mellowforge/items-grid-react",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "React component over @mellowforge/items-grid-core: a card grid that fits the screen exactly, with size presets, fixed or measured row height, client or server paging, live or stable realtime reflow, skeletons and an optional pager.",
   "license": "MIT",
   "author": "Konstantin Penzin",
