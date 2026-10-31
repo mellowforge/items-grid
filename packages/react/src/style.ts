@@ -1,4 +1,4 @@
-import type { StyleDeclarations } from '@quietfoundry/items-grid-core';
+import type { StyleDeclarations } from '@mellowforge/items-grid-core';
 import type { CSSProperties } from 'react';
 
 /** Converts the core's kebab-case declarations into a React `style` object. */

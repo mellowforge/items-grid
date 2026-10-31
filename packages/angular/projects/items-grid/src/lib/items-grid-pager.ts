@@ -5,7 +5,7 @@ import {
   type ItemsGridState,
   type PagerLabels,
   resolvePagerLabels,
-} from '@quietfoundry/items-grid-core';
+} from '@mellowforge/items-grid-core';
 
 /**
  * The optional pager: status text, previous / next and a compact list of page buttons.

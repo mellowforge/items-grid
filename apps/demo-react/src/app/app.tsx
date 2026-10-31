@@ -4,8 +4,8 @@ import type {
   PageRequest,
   PagingMode,
   ReflowMode,
-} from '@quietfoundry/items-grid-core';
-import { ItemsGrid } from '@quietfoundry/items-grid-react';
+} from '@mellowforge/items-grid-core';
+import { ItemsGrid } from '@mellowforge/items-grid-react';
 import {
   ALIGN_OPTIONS,
   type CardSize,

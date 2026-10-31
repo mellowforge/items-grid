@@ -1,6 +1,6 @@
 import { Component, signal, viewChild } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import type { PageRequest, PagingMode } from '@quietfoundry/items-grid-core';
+import type { PageRequest, PagingMode } from '@mellowforge/items-grid-core';
 
 import { flushFrames, installLayoutStubs, ResizeObserverStub } from '../test-utils/resize-observer';
 import { QfItemsGrid } from './items-grid';

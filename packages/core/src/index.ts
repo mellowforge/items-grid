@@ -1,5 +1,5 @@
 /*
- * Public API Surface of @quietfoundry/items-grid-core
+ * Public API Surface of @mellowforge/items-grid-core
  */
 
 export {

@@ -1,4 +1,4 @@
-import '@quietfoundry/items-grid-core/styles.css';
+import '@mellowforge/items-grid-core/styles.css';
 import 'demo-shared/demo.css';
 
 import { StrictMode } from 'react';

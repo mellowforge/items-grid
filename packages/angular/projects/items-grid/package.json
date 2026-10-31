@@ -1,7 +1,7 @@
 {
-  "name": "@quietfoundry/items-grid-angular",
+  "name": "@mellowforge/items-grid-angular",
   "version": "0.0.0",
-  "description": "Angular component over @quietfoundry/items-grid-core: a card grid that fits the screen exactly, with size presets, fixed or measured row height, client or server paging, live or stable realtime reflow, skeletons and an optional pager. Signals, zoneless-ready, no Material or CDK dependency.",
+  "description": "Angular component over @mellowforge/items-grid-core: a card grid that fits the screen exactly, with size presets, fixed or measured row height, client or server paging, live or stable realtime reflow, skeletons and an optional pager. Signals, zoneless-ready, no Material or CDK dependency.",
   "license": "MIT",
   "author": "Konstantin Penzin",
   "homepage": "https://github.com/Constantine-24/items-grid#readme",
@@ -29,7 +29,7 @@
   "peerDependencies": {
     "@angular/common": ">=22.0.0",
     "@angular/core": ">=22.0.0",
-    "@quietfoundry/items-grid-core": "workspace:0.x"
+    "@mellowforge/items-grid-core": "workspace:0.x"
   },
   "dependencies": {
     "tslib": "^2.3.0"

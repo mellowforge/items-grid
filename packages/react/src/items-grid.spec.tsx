@@ -1,4 +1,4 @@
-import type { ItemsGridHandle, PageRequest } from '@quietfoundry/items-grid-core';
+import type { ItemsGridHandle, PageRequest } from '@mellowforge/items-grid-core';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Component, createRef, type ReactNode, type Ref, StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

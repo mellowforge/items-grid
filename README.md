@@ -15,11 +15,11 @@ It moves the code every dashboard keeps re-implementing into one place:
   count), **per-slot skeletons**, an **empty state** and an optional, unstyled **pager**.
 - **Grid only.** You render the cards; the library never ships card markup.
 
-| Package                                                                              | Description                                |
-| ------------------------------------------------------------------------------------ | ------------------------------------------ |
-| [`@quietfoundry/items-grid-core`](packages/core/README.md)                           | Headless engine + vanilla `mountItemsGrid` |
-| [`@quietfoundry/items-grid-react`](packages/react/README.md)                         | `<ItemsGrid>`, `useItemsGrid`              |
-| [`@quietfoundry/items-grid-angular`](packages/angular/projects/items-grid/README.md) | `<qf-items-grid>` with template directives |
+| Package                                                                             | Description                                |
+| ----------------------------------------------------------------------------------- | ------------------------------------------ |
+| [`@mellowforge/items-grid-core`](packages/core/README.md)                           | Headless engine + vanilla `mountItemsGrid` |
+| [`@mellowforge/items-grid-react`](packages/react/README.md)                         | `<ItemsGrid>`, `useItemsGrid`              |
+| [`@mellowforge/items-grid-angular`](packages/angular/projects/items-grid/README.md) | `<qf-items-grid>` with template directives |
 
 ## How it fits
 
@@ -37,7 +37,7 @@ CSS Grid with JS-computed tracks — the last row stays aligned and the page cou
 
 ```sh
 pnpm install
-pnpm --filter @quietfoundry/items-grid-core build   # demo-vanilla consumes the built core
+pnpm --filter @mellowforge/items-grid-core build   # demo-vanilla consumes the built core
 pnpm --filter demo-vanilla dev                      # plain DOM, published package layout
 pnpm --filter demo-react dev                        # React, source-linked
 pnpm --filter demo-angular start                    # Angular, source-linked

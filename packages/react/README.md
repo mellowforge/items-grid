@@ -1,19 +1,19 @@
-# @quietfoundry/items-grid-react
+# @mellowforge/items-grid-react
 
-React component over [`@quietfoundry/items-grid-core`](../core/README.md): a card grid that
+React component over [`@mellowforge/items-grid-core`](../core/README.md): a card grid that
 fits its container exactly — full rows and columns only — and pages the rest. Size presets,
 fixed or measured row height, client or server paging, live or stable realtime reflow,
 skeletons and an optional pager. React 18 and 19.
 
 ```sh
-npm install @quietfoundry/items-grid-react @quietfoundry/items-grid-core
+npm install @mellowforge/items-grid-react @mellowforge/items-grid-core
 ```
 
 ## Usage
 
 ```tsx
-import { ItemsGrid } from '@quietfoundry/items-grid-react';
-import '@quietfoundry/items-grid-core/styles.css'; // optional pager theme
+import { ItemsGrid } from '@mellowforge/items-grid-react';
+import '@mellowforge/items-grid-core/styles.css'; // optional pager theme
 
 export function Devices({ devices }: { devices: Device[] }) {
   return (

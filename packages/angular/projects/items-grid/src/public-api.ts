@@ -1,5 +1,5 @@
 /*
- * Public API Surface of @quietfoundry/items-grid-angular
+ * Public API Surface of @mellowforge/items-grid-angular
  */
 
 export * from './lib/items-grid';

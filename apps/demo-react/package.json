@@ -10,8 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@quietfoundry/items-grid-core": "workspace:*",
-    "@quietfoundry/items-grid-react": "workspace:*",
+    "@mellowforge/items-grid-core": "workspace:*",
+    "@mellowforge/items-grid-react": "workspace:*",
     "demo-shared": "workspace:*",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

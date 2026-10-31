@@ -1,5 +1,5 @@
 {
-  "name": "@quietfoundry/items-grid-core",
+  "name": "@mellowforge/items-grid-core",
   "version": "0.0.0",
   "description": "Headless engine for card grids that fit the screen: exact page size from the viewport, fixed or measured row height, size presets, client or server paging, live or stable realtime reflow. Zero dependencies.",
   "license": "MIT",

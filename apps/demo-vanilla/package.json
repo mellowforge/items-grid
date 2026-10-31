@@ -9,7 +9,7 @@
     "test": "tsc --noEmit"
   },
   "dependencies": {
-    "@quietfoundry/items-grid-core": "workspace:*",
+    "@mellowforge/items-grid-core": "workspace:*",
     "demo-shared": "workspace:*"
   },
   "devDependencies": {

@@ -5,7 +5,7 @@ import {
   type ItemsGridOptions,
   type ItemsGridState,
   observeSize,
-} from '@quietfoundry/items-grid-core';
+} from '@mellowforge/items-grid-core';
 import {
   type RefObject,
   useEffect,

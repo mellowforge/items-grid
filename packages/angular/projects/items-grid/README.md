@@ -1,12 +1,12 @@
-# @quietfoundry/items-grid-angular
+# @mellowforge/items-grid-angular
 
-Angular component over `@quietfoundry/items-grid-core`: a card grid that fits its host
+Angular component over `@mellowforge/items-grid-core`: a card grid that fits its host
 exactly — full rows and columns only — and pages the rest. Size presets, fixed or measured
 row height, client or server paging, live or stable realtime reflow, skeletons and an
 optional pager. Signal inputs, zoneless-ready, no Material or CDK dependency. Angular 22+.
 
 ```sh
-npm install @quietfoundry/items-grid-angular @quietfoundry/items-grid-core
+npm install @mellowforge/items-grid-angular @mellowforge/items-grid-core
 ```
 
 ## Usage
@@ -17,7 +17,7 @@ import {
   QfItemsGridEmpty,
   QfItemsGridItem,
   QfItemsGridSkeleton,
-} from '@quietfoundry/items-grid-angular';
+} from '@mellowforge/items-grid-angular';
 
 @Component({
   selector: 'app-devices',
@@ -60,7 +60,7 @@ export class Devices {
 ```
 
 Optional pager theme — import it once from a global stylesheet:
-`@import '@quietfoundry/items-grid-core/styles.css';`
+`@import '@mellowforge/items-grid-core/styles.css';`
 
 `[qfItemsGridItemOf]` is only for typing: with `strictTemplates`, `let-device` is then a
 `Device`; without it, `let-device` is `any`. A grid without an item template renders empty

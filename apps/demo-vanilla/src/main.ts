@@ -1,4 +1,4 @@
-import '@quietfoundry/items-grid-core/styles.css';
+import '@mellowforge/items-grid-core/styles.css';
 import 'demo-shared/demo.css';
 
 import {
@@ -8,7 +8,7 @@ import {
   type PageRequest,
   type PagingMode,
   type ReflowMode,
-} from '@quietfoundry/items-grid-core';
+} from '@mellowforge/items-grid-core';
 import {
   ALIGN_OPTIONS,
   type CardSize,

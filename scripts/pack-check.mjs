@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Packs every publishable package exactly as `pnpm publish` would (honouring
- * `publishConfig.directory` for @quietfoundry/items-grid-angular) and checks each tarball:
+ * `publishConfig.directory` for @mellowforge/items-grid-angular) and checks each tarball:
  * required files present, no sources or specs, no `workspace:` specifier left
  * in the packed package.json, and type declarations that resolve for every
  * consumer (arethetypeswrong). Run after `pnpm build`.
@@ -27,8 +27,8 @@ const PACKAGES = [
     dir: 'packages/angular/projects/items-grid',
     attw: ['--profile', 'esm-only'],
     required: [
-      'fesm2022/quietfoundry-items-grid-angular.mjs',
-      'types/quietfoundry-items-grid-angular.d.ts',
+      'fesm2022/mellowforge-items-grid-angular.mjs',
+      'types/mellowforge-items-grid-angular.d.ts',
     ],
   },
 ];

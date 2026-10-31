@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-**items-grid** — card grids that fit the screen exactly. A headless, zero-dependency engine (`@quietfoundry/items-grid-core`, with a vanilla `mountItemsGrid`) plus thin adapters for React (`@quietfoundry/items-grid-react`) and Angular (`@quietfoundry/items-grid-angular`), published from this pnpm monorepo. Conventions mirror the sibling repo `treekit`.
+**items-grid** — card grids that fit the screen exactly. A headless, zero-dependency engine (`@mellowforge/items-grid-core`, with a vanilla `mountItemsGrid`) plus thin adapters for React (`@mellowforge/items-grid-react`) and Angular (`@mellowforge/items-grid-angular`), published from this pnpm monorepo. Conventions mirror the sibling repo `treekit`.
 
 Everything under `packages/` is public API: favour backwards compatibility, TSDoc and test coverage over cleverness, and keep the two adapters in parity. Use **context7** for Angular / React / Vite / Vitest / Changesets docs and **chrome-devtools** for checking layout in the demos — jsdom has no layout, so fit-to-screen behaviour is only proven in a browser.
 
@@ -20,7 +20,7 @@ apps/demo-react, apps/demo-angular  source-linked mirrors of each other
 ## Commands
 
 - `pnpm build` (core → react → angular → apps), `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm pack:check`.
-- Scoped: `pnpm --filter @quietfoundry/items-grid-core exec vitest run src/controller.spec.ts -t '<name>'`; Angular: `cd packages/angular && pnpm ng test --watch=false`.
+- Scoped: `pnpm --filter @mellowforge/items-grid-core exec vitest run src/controller.spec.ts -t '<name>'`; Angular: `cd packages/angular && pnpm ng test --watch=false`.
 - Adapters, `demo-vanilla` and the Angular library resolve core from `packages/core/dist` — **build core first** after changing it.
 
 ## Architecture invariants

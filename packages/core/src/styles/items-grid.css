@@ -1,5 +1,5 @@
 /*
- * @quietfoundry/items-grid-core/styles.css — optional pager theme.
+ * @mellowforge/items-grid-core/styles.css — optional pager theme.
  *
  * Layout never depends on this file: the grid applies its track layout inline. Import it
  * for a minimal pager look, or skip it and style the `qf-items-grid*` class hooks yourself.

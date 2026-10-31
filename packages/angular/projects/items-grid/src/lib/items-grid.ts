@@ -35,7 +35,7 @@ import {
   type ReflowMode,
   shouldPageGrid,
   type SizePreset,
-} from '@quietfoundry/items-grid-core';
+} from '@mellowforge/items-grid-core';
 
 import { QfItemsGridPager } from './items-grid-pager';
 import { QfItemsGridEmpty, QfItemsGridItem, QfItemsGridSkeleton } from './items-grid-templates';

@@ -4,9 +4,9 @@
   "commit": false,
   "fixed": [
     [
-      "@quietfoundry/items-grid-core",
-      "@quietfoundry/items-grid-angular",
-      "@quietfoundry/items-grid-react"
+      "@mellowforge/items-grid-core",
+      "@mellowforge/items-grid-angular",
+      "@mellowforge/items-grid-react"
     ]
   ],
   "linked": [],

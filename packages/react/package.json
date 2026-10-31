@@ -1,7 +1,7 @@
 {
-  "name": "@quietfoundry/items-grid-react",
+  "name": "@mellowforge/items-grid-react",
   "version": "0.0.0",
-  "description": "React component over @quietfoundry/items-grid-core: a card grid that fits the screen exactly, with size presets, fixed or measured row height, client or server paging, live or stable realtime reflow, skeletons and an optional pager.",
+  "description": "React component over @mellowforge/items-grid-core: a card grid that fits the screen exactly, with size presets, fixed or measured row height, client or server paging, live or stable realtime reflow, skeletons and an optional pager.",
   "license": "MIT",
   "author": "Konstantin Penzin",
   "homepage": "https://github.com/Constantine-24/items-grid#readme",
@@ -52,13 +52,13 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@quietfoundry/items-grid-core": "workspace:0.x",
+    "@mellowforge/items-grid-core": "workspace:0.x",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@quietfoundry/items-grid-core": "workspace:*",
+    "@mellowforge/items-grid-core": "workspace:*",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.3.0",
     "@types/node": "^22.20.5",

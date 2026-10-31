@@ -3,7 +3,7 @@
   "compilerOptions": {
     "noEmit": true,
     "paths": {
-      "@quietfoundry/items-grid-core": ["../../packages/core/src/index.ts"]
+      "@mellowforge/items-grid-core": ["../../packages/core/src/index.ts"]
     }
   },
   "include": ["src"]

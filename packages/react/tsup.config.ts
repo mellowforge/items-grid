@@ -6,7 +6,7 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   clean: true,
-  external: ['react', 'react-dom', '@quietfoundry/items-grid-core'],
+  external: ['react', 'react-dom', '@mellowforge/items-grid-core'],
   // The component uses hooks and DOM refs, so it must be a client component under RSC.
   banner: { js: "'use client';" },
 });

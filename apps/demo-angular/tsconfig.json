@@ -18,14 +18,14 @@
      * Source-linked, not dist-linked. Pointing these at build output means the
      * dev server neither watches nor rebuilds them, so every library edit is
      * silently stale in the demo until you rebuild and restart. Packaging is still verified
-     * by `pnpm build` in CI, and demo-vanilla still consumes @quietfoundry/items-grid-core
+     * by `pnpm build` in CI, and demo-vanilla still consumes @mellowforge/items-grid-core
      * through its published `exports` map.
      */
     "paths": {
-      "@quietfoundry/items-grid-angular": [
+      "@mellowforge/items-grid-angular": [
         "../../packages/angular/projects/items-grid/src/public-api.ts"
       ],
-      "@quietfoundry/items-grid-core": ["../../packages/core/src/index.ts"],
+      "@mellowforge/items-grid-core": ["../../packages/core/src/index.ts"],
       "demo-shared": ["../demo-shared/src/index.ts"]
     }
   },

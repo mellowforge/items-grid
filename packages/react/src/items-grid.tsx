@@ -11,7 +11,7 @@ import {
   type ItemsGridState,
   type PagerLabels,
   shouldPageGrid,
-} from '@quietfoundry/items-grid-core';
+} from '@mellowforge/items-grid-core';
 import {
   type CSSProperties,
   type ForwardedRef,

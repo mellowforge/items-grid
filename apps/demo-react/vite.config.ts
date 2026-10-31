@@ -10,15 +10,15 @@ export default defineConfig({
     // Source-linked: the libraries resolve to their sources, so edits hot-reload with no rebuild.
     alias: [
       {
-        find: /^@quietfoundry\/items-grid-core$/,
+        find: /^@mellowforge\/items-grid-core$/,
         replacement: source('../../packages/core/src/index.ts'),
       },
       {
-        find: /^@quietfoundry\/items-grid-core\/styles\.css$/,
+        find: /^@mellowforge\/items-grid-core\/styles\.css$/,
         replacement: source('../../packages/core/src/styles/items-grid.css'),
       },
       {
-        find: /^@quietfoundry\/items-grid-react$/,
+        find: /^@mellowforge\/items-grid-react$/,
         replacement: source('../../packages/react/src/index.ts'),
       },
       { find: /^demo-shared$/, replacement: source('../demo-shared/src/index.ts') },
@@ -26,7 +26,7 @@ export default defineConfig({
     ],
   },
   // Backstop against Vite serving a stale pre-bundled copy of a workspace library.
-  optimizeDeps: { exclude: ['@quietfoundry/items-grid-core', '@quietfoundry/items-grid-react'] },
+  optimizeDeps: { exclude: ['@mellowforge/items-grid-core', '@mellowforge/items-grid-react'] },
   test: {
     environment: 'jsdom',
     include: ['src/**/*.spec.tsx'],

@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@quietfoundry/items-grid-core": "workspace:*",
+    "@mellowforge/items-grid-core": "workspace:*",
     "typescript": "^5.8.0",
     "vitest": "^5.0.5"
   }

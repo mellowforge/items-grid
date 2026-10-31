@@ -1,5 +1,5 @@
 /*
- * Public API Surface of @quietfoundry/items-grid-react
+ * Public API Surface of @mellowforge/items-grid-react
  */
 
 export { ItemsGrid } from './items-grid';

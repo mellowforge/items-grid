@@ -4,14 +4,14 @@ import {
   QfItemsGridEmpty,
   QfItemsGridItem,
   QfItemsGridSkeleton,
-} from '@quietfoundry/items-grid-angular';
+} from '@mellowforge/items-grid-angular';
 import type {
   GridAlign,
   ItemsGridState,
   PageRequest,
   PagingMode,
   ReflowMode,
-} from '@quietfoundry/items-grid-core';
+} from '@mellowforge/items-grid-core';
 import {
   ALIGN_OPTIONS,
   type CardSize,

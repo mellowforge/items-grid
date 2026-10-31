@@ -1,4 +1,4 @@
-import type { PageRequest } from '@quietfoundry/items-grid-core';
+import type { PageRequest } from '@mellowforge/items-grid-core';
 
 import type { Entity } from './entities';
 

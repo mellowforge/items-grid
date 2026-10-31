@@ -1,15 +1,15 @@
-# @quietfoundry/items-grid-core
+# @mellowforge/items-grid-core
 
 Headless engine for **card grids that fit the screen exactly**. Give it a container and your
 items, and it decides how many cards fit — full rows and columns only, no inner scrolling —
 and pages the rest. Zero dependencies, framework-agnostic, SSR-safe.
 
 Use it directly (vanilla `mountItemsGrid`), or through
-[`@quietfoundry/items-grid-react`](../react/README.md) or
-[`@quietfoundry/items-grid-angular`](../angular/projects/items-grid/README.md).
+[`@mellowforge/items-grid-react`](../react/README.md) or
+[`@mellowforge/items-grid-angular`](../angular/projects/items-grid/README.md).
 
 ```sh
-npm install @quietfoundry/items-grid-core
+npm install @mellowforge/items-grid-core
 ```
 
 ## What it solves
@@ -35,8 +35,8 @@ npm install @quietfoundry/items-grid-core
 ## Quick start (vanilla)
 
 ```ts
-import { mountItemsGrid } from '@quietfoundry/items-grid-core';
-import '@quietfoundry/items-grid-core/styles.css'; // optional pager theme
+import { mountItemsGrid } from '@mellowforge/items-grid-core';
+import '@mellowforge/items-grid-core/styles.css'; // optional pager theme
 
 const grid = mountItemsGrid(document.querySelector<HTMLElement>('#devices')!, {
   items: devices,
@@ -156,7 +156,7 @@ uses real buttons with labels and `aria-current="page"`.
 
 ## Styling
 
-Layout is applied inline; no stylesheet is required. `@quietfoundry/items-grid-core/styles.css`
+Layout is applied inline; no stylesheet is required. `@mellowforge/items-grid-core/styles.css`
 is an optional, minimal pager theme. Theme it with `--qf-items-grid-*` custom properties set
 anywhere up the tree (e.g. `:root`); every value has a fallback, so the pager also works when
 placed outside the grid. Class hooks: `qf-items-grid`, `qf-items-grid__viewport`, `__cell`,

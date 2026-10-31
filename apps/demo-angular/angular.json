@@ -86,7 +86,7 @@
           "builder": "@angular/build:dev-server",
           "options": {
             "prebundle": {
-              "exclude": ["@quietfoundry/items-grid-core"]
+              "exclude": ["@mellowforge/items-grid-core"]
             }
           },
           "configurations": {

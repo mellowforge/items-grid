@@ -5,7 +5,7 @@ import {
   type ItemsGridState,
   type PagerLabels,
   resolvePagerLabels,
-} from '@quietfoundry/items-grid-core';
+} from '@mellowforge/items-grid-core';
 import type { ReactElement } from 'react';
 
 /** Props of {@link ItemsGridPager}. */
