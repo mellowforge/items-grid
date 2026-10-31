@@ -1298,33 +1298,49 @@ describe('ItemsGridController — a throwing onPageRequest', () => {
     vi.useFakeTimers();
   });
 
-  it('is not re-sent by the update it failed in, only by the next one', () => {
+  const failingServer = () => {
+    const requests: PageRequest[] = [];
+    const state = { fail: false };
+    const controller = setup({
+      mode: 'server',
+      items: entities(12),
+      total: 120,
+      onPageRequest: request => {
+        requests.push(request);
+        if (state.fail) throw new Error('offline');
+      },
+    });
+    return { controller, requests, state };
+  };
+
+  // In React and Angular the `loading` an onPageRequest sets reaches the grid as a later
+  // update, which asks again; vanilla gets the same single, debounced retry.
+  it('re-sends a failed request once, debounced, and logs a second failure', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     const requests: number[] = [];
-    let fail = false;
     const controller: ItemsGridController<Entity> = setup({
       mode: 'server',
       items: entities(12),
       total: 120,
       onPageRequest: request => {
         requests.push(request.pageIndex);
-        if (fail) {
-          // The app starts loading, then its fetch throws synchronously.
+        if (request.pageIndex === 2) {
           controller.setOptions({ loading: true });
           throw new Error('offline');
         }
       },
     });
-    fail = true;
     expect(() => controller.goTo(2)).toThrow('offline');
-    fail = false;
-    vi.advanceTimersByTime(1000);
-    // The loading it set in the failing call owed a request; that is not re-sent.
     expect(requests.filter(page => page === 2)).toHaveLength(1);
-
-    // The app's next update asks for the page again.
-    controller.setOptions({ loading: false });
     vi.advanceTimersByTime(1000);
     expect(requests.filter(page => page === 2)).toHaveLength(2);
+    expect(errors).toHaveBeenCalledWith(
+      expect.stringContaining('items-grid: a debounced page request failed'),
+      expect.objectContaining({ message: 'offline' })
+    );
+    vi.advanceTimersByTime(5000);
+    expect(requests.filter(page => page === 2)).toHaveLength(2);
+    errors.mockRestore();
   });
 
   it('asks again on the next update after a failed first layout', () => {
@@ -1346,7 +1362,7 @@ describe('ItemsGridController — a throwing onPageRequest', () => {
     expect(requests).toEqual([0, 0]);
   });
 
-  it('records no failure when the callback destroyed the grid', () => {
+  it('requests the page again after an unmount during the failing call', () => {
     const requests: number[] = [];
     let fail = false;
     const controller: ItemsGridController<Entity> = setup({
@@ -1358,63 +1374,71 @@ describe('ItemsGridController — a throwing onPageRequest', () => {
         if (fail) {
           fail = false;
           controller.destroy();
-          throw new Error('offline');
+          throw new Error('unmounted');
         }
       },
     });
     fail = true;
-    expect(() => controller.goTo(2)).toThrow('offline');
-    // Re-subscribed (e.g. a StrictMode remount): the next layout requests its page again.
+    expect(() => controller.goTo(2)).toThrow('unmounted');
+    // Remounted (e.g. React StrictMode): the next layout requests its page again.
     controller.subscribe(() => {});
-    vi.advanceTimersByTime(1000);
-    expect(requests.filter(page => page === 2)).toHaveLength(1);
-    controller.setViewportSize(NARROW);
-    vi.advanceTimersByTime(1000);
-    expect(requests.at(-1)).toBe(2);
-  });
-
-  it('forgets the failure once a later request goes through', () => {
-    const requests: PageRequest[] = [];
-    let fail = false;
-    const controller = setup({
-      mode: 'server',
-      items: entities(12),
-      total: 120,
-      onPageRequest: request => {
-        requests.push(request);
-        if (fail) throw new Error('offline');
-      },
-    });
-    fail = true;
-    expect(() => controller.goTo(2)).toThrow('offline');
-    fail = false;
-    controller.setViewportSize(NARROW);
-    vi.advanceTimersByTime(1000);
     controller.setViewportSize(WIDE);
     vi.advanceTimersByTime(1000);
-    expect(requests.slice(-2)).toEqual([
-      { pageIndex: 2, pageSize: 9 },
-      { pageIndex: 2, pageSize: 12 },
-    ]);
+    expect(requests.filter(page => page === 2)).toHaveLength(2);
   });
 
   it('still sends the next page size after a failure', () => {
-    const requests: PageRequest[] = [];
-    let fail = false;
-    const controller = setup({
-      mode: 'server',
-      items: entities(12),
-      total: 120,
-      onPageRequest: request => {
-        requests.push(request);
-        if (fail) throw new Error('offline');
-      },
-    });
-    fail = true;
+    const { controller, requests, state } = failingServer();
+    state.fail = true;
     expect(() => controller.goTo(2)).toThrow('offline');
-    fail = false;
+    state.fail = false;
     controller.setViewportSize(NARROW);
     vi.advanceTimersByTime(1000);
     expect(requests.at(-1)).toEqual({ pageIndex: 2, pageSize: 9 });
+  });
+
+  it('keeps request dedupe when a mode switch rolls back', () => {
+    const { controller, requests } = failingServer();
+    expect(requests).toEqual([{ pageIndex: 0, pageSize: 12 }]);
+    const throwingKey = (): never => {
+      throw new Error('bad key');
+    };
+    expect(() => controller.setOptions({ mode: 'client', getKey: throwingKey })).toThrow('bad key');
+    controller.goTo(0);
+    controller.setOptions({ loading: true });
+    vi.advanceTimersByTime(1000);
+    expect(requests).toHaveLength(1);
+  });
+});
+
+describe('ItemsGridController — a throwing call nested in a subscriber', () => {
+  it('keeps the outer change and rolls back only the inner one', () => {
+    let fail = false;
+    const pages: number[] = [];
+    const controller = setup({
+      onPageChange: page => pages.push(page),
+      messages: {
+        page: info => {
+          if (fail) throw new Error('bad message');
+          return `Page ${info.pageIndex + 1}`;
+        },
+      },
+    });
+    let once = true;
+    controller.subscribe(() => {
+      if (!once) return;
+      once = false;
+      fail = true;
+      try {
+        controller.goTo(3);
+      } finally {
+        fail = false;
+      }
+    });
+    expect(() => controller.setOptions({ align: 'center' })).toThrow('bad message');
+    expect(controller.getState()).toMatchObject({ align: 'center', pageIndex: 0 });
+    controller.setViewportSize(NARROW);
+    expect(controller.getState().pageIndex).toBe(0);
+    expect(pages).toEqual([]);
   });
 });

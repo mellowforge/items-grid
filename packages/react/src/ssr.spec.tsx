@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { useLayoutEffect } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -19,16 +20,35 @@ vi.mock('react', async importOriginal => {
 });
 
 describe('server rendering', () => {
-  it('renders the grid without layout effects', () => {
+  it('counts a direct useLayoutEffect (the mock intercepts it)', () => {
+    function Probe(): null {
+      useLayoutEffect(() => {});
+      return null;
+    }
+    layoutEffects.calls = 0;
+    renderToString(<Probe />);
+    expect(layoutEffects.calls).toBeGreaterThan(0);
+  });
+
+  it('renders the grid without layout effects, errors or warnings', () => {
     expect(typeof window).toBe('undefined');
+    const error = vi.spyOn(console, 'error');
+    const warn = vi.spyOn(console, 'warn');
+    layoutEffects.calls = 0;
     const html = renderToString(
       <ItemsGrid
         items={[{ id: 1 }, { id: 2 }]}
         getKey={item => item.id}
+        mode="server"
+        total={50}
+        measureRowHeight
+        loading
         renderItem={item => <span>Entity {item.id}</span>}
       />
     );
     expect(html).toContain('mf-items-grid__viewport');
     expect(layoutEffects.calls).toBe(0);
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
   });
 });

@@ -118,9 +118,8 @@ then pass the page as `items` and the dataset size as `total` (or leave `total` 
 Guard against out-of-order responses. On a failed fetch, clear `loading` and the page's
 `items` (so the previous page never shows under the new page's numbers), and retry with
 `refresh()` — navigating to the same page again does not re-request it. If `onPageRequest`
-itself throws, the update it failed in does not re-send it (even when the callback had already
-set `loading`); the app's next update — new options, a resize, navigation or `refresh()` —
-asks for the page again. With a known total,
+itself throws, the request does not count as sent: the grid's next update asks for the page
+again once (debounced; a second failure is logged), and `refresh()` retries it at once. With a known total,
 `range` follows `total`, not the length of `items`; while the total is unknown, emptiness is
 only reported once you pass `total: 0`.
 

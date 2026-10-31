@@ -508,3 +508,29 @@ describe('mountItemsGrid', () => {
     expect(observer.disconnected).toBe(true);
   });
 });
+
+describe('mountItemsGrid — update() when app code throws mid-update', () => {
+  it('keeps the previous renderer and page', () => {
+    let fail = false;
+    const grid = mount({
+      messages: {
+        page: info => {
+          if (fail) throw new Error('bad message');
+          return `Page ${info.pageIndex + 1}`;
+        },
+      },
+    });
+    layout();
+    const renamed = (item: Entity): HTMLElement => {
+      const card = document.createElement('article');
+      card.textContent = `New ${item.name}`;
+      return card;
+    };
+    fail = true;
+    expect(() => grid.update({ renderItem: renamed, pageIndex: 1 })).toThrow('bad message');
+    fail = false;
+    grid.update({ align: 'center' });
+    expect(texts()[0]).toBe('Entity 0');
+    expect(grid.controller.getState().pageIndex).toBe(0);
+  });
+});

@@ -142,8 +142,8 @@ export interface ItemsGridOptions<T> {
   readonly requestDebounceMs?: number;
   /**
    * Server mode: called when the grid needs a page the app has not supplied yet. If it
-   * throws, the grid does not re-send that page from the same update; the app's next update
-   * (options, a resize, navigation or `refresh()`) asks for it again.
+   * throws, the request does not count as sent: the grid's next update asks for the page
+   * again (debounced), and `refresh()` retries it at once.
    */
   readonly onPageRequest?: (request: PageRequest) => void;
   /**
@@ -380,11 +380,6 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   /** Server stable mode: the known total when the page was frozen. */
   private _baselineTotal: number | null = null;
   private _lastRequest: PageRequest | null = null;
-  /**
-   * The request whose `onPageRequest` threw. The effects of that same update do not re-send
-   * it; the next update the app starts (outermost `_apply`) forgets it.
-   */
-  private _failedRequest: PageRequest | null = null;
   private _requestTimer: ReturnType<typeof setTimeout> | null = null;
   private _announcement = '';
   private _state: ItemsGridState<T>;
@@ -439,7 +434,6 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
       if (modeChanged) {
         // A new data source: forget the last request (the 'mode' sync requests or cancels).
         this._lastRequest = null;
-        this._failedRequest = null;
       }
       if (modeChanged || previous.reflow !== next.reflow) {
         this._snapshot = null;
@@ -470,10 +464,6 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   private _apply(change: () => { cause: SyncCause; navigated?: boolean }): readonly Caught[] {
     const restore = this._checkpoint();
     try {
-      if (this._depth === 0) {
-        // A new update from the app: a page whose onPageRequest threw may be asked for again.
-        this._failedRequest = null;
-      }
       const { cause, navigated = false } = change();
       return this._sync(cause, navigated);
     } catch (error) {
@@ -491,7 +481,6 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     const snapshot = this._snapshot;
     const baselineTotal = this._baselineTotal;
     const lastRequest = this._lastRequest;
-    const failedRequest = this._failedRequest;
     const pageIndex = this._pageIndex;
     const anchorIndex = this._anchorIndex;
     return () => {
@@ -499,7 +488,6 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
       this._snapshot = snapshot;
       this._baselineTotal = baselineTotal;
       this._lastRequest = lastRequest;
-      this._failedRequest = failedRequest;
       this._pageIndex = pageIndex;
       this._anchorIndex = anchorIndex;
     };
@@ -634,7 +622,6 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   destroy(): void {
     this._cancelRequest();
     this._lastRequest = null;
-    this._failedRequest = null;
     // Nothing owed survives: a sync that a subscriber destroyed runs no effects.
     this._owedRequest = null;
     this._reportedPageIndex = this._state.pageIndex;
@@ -977,11 +964,6 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   // MARK: - Server requests
 
   private _request(request: PageRequest, immediate: boolean, force: boolean): void {
-    if (!immediate && !force && sameRequest(this._failedRequest, request)) {
-      // The app's onPageRequest threw for this page; only navigation or refresh() retries it.
-      this._cancelRequest();
-      return;
-    }
     if (sameRequest(this._lastRequest, request) && !force) {
       if (immediate) {
         this._cancelRequest();
@@ -1016,8 +998,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     if (
       this._options.mode !== 'server' ||
       pageSize <= 0 ||
-      sameRequest(this._lastRequest, request) ||
-      sameRequest(this._failedRequest, request)
+      sameRequest(this._lastRequest, request)
     ) {
       return;
     }
@@ -1030,16 +1011,10 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     try {
       this._options.onPageRequest?.(request);
     } catch (error) {
-      // Not sent after all: the app's next update must be able to ask for it again, but this
-      // update's effects don't re-send it (e.g. when the failing callback also set `loading`).
-      // Nothing is recorded if the callback destroyed the grid or sent another request.
-      if (this._lastRequest === request) {
-        this._lastRequest = previous;
-        this._failedRequest = request;
-      }
+      // Not sent after all: the next update (or refresh()) must be able to ask for it again.
+      if (this._lastRequest === request) this._lastRequest = previous;
       throw error;
     }
-    this._failedRequest = null;
   }
 
   private _cancelRequest(): void {
