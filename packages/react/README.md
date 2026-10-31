@@ -37,6 +37,8 @@ Every option of the core (`mode`, `total`, `preset`, `presets`, `measureRowHeigh
 see the [core README](../core/README.md#options-itemsgridoptionst). Callbacks may be inline
 arrows: they are read from a latest-value ref, so a new identity never re-syncs the grid.
 Object props (`items`, `presets`, `sampleItem`) are compared by identity, so memoize them.
+Theming and dark mode for the optional pager theme: see the
+[core README](../core/README.md#styling).
 
 Additional props:
 

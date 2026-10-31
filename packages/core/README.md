@@ -171,11 +171,16 @@ placed outside the grid. Class hooks: `mf-items-grid`, `mf-items-grid__viewport`
 `__cell--skeleton`, `__empty`, `__probe`, `__live`, `mf-items-grid-pager`, `__status`,
 `__list`, `__button`, `__gap`.
 
-Dark mode needs no setup: the pager's colours derive from `currentColor`, and its accent
-follows the page's `color-scheme` through `light-dark()` — declare `color-scheme: light dark`
-(or `dark`) and the current page and focus ring switch to a lighter indigo. Browsers without
-`light-dark()` keep the light accent; set `--mf-items-grid-pager-current-color` and
-`--mf-items-grid-focus-ring` to override it either way.
+Dark mode needs no theme variables. The pager's text, borders and muted text derive from the
+inherited text colour (`currentColor`), and its accent follows the inherited `color-scheme`
+through `light-dark()`: with `color-scheme: dark`, or `light dark` when the OS prefers dark,
+the current page and focus ring switch to a lighter indigo. A dark theme built only on a
+`prefers-color-scheme` media query, without `color-scheme`, keeps the light accent — declare
+`color-scheme` or set the properties below. Browsers without `light-dark()` keep the light
+accent. `--mf-items-grid-pager-current-color`, `--mf-items-grid-pager-current-background` and
+`--mf-items-grid-focus-ring` override the accent in every browser and replace the automatic
+switch, so give them scheme-aware values (`light-dark()` or a media query) to keep both
+schemes.
 
 ## License
 

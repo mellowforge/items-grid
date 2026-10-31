@@ -7,15 +7,20 @@
  * Theme with the --mf-items-grid-* custom properties, set anywhere up the tree (e.g. on
  * :root). Every value has a fallback here, so the pager also works outside the grid.
  *
- * Dark mode: the fallbacks derive from currentColor, and the accent follows the element's
+ * Dark mode: the fallbacks derive from currentColor, and the accent follows the inherited
  * `color-scheme` (light-dark()), so a page with `color-scheme: dark` (or `light dark` on a
- * dark OS) gets a readable pager without setting anything. Browsers without light-dark()
- * keep the light accent.
+ * dark OS) gets a readable pager without theme variables. Browsers without light-dark()
+ * keep the light accent; the --mf-items-grid-* overrides win in every browser.
  */
 
-.mf-items-grid-pager {
-  /* Private: the default accent, swapped for a scheme-aware one below. */
+/* Private: the default accent, swapped for a scheme-aware one below. Declared on the
+   button too, so a custom pager that reuses only the button class keeps it. */
+.mf-items-grid-pager,
+.mf-items-grid-pager__button {
   --_mf-items-grid-accent: #4f46e5;
+}
+
+.mf-items-grid-pager {
   display: flex;
   flex: none;
   align-items: center;
@@ -77,7 +82,8 @@
 }
 
 @supports (color: light-dark(#000, #fff)) {
-  .mf-items-grid-pager {
+  .mf-items-grid-pager,
+  .mf-items-grid-pager__button {
     --_mf-items-grid-accent: light-dark(#4f46e5, #a4bcfd);
   }
 }

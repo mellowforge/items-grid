@@ -60,7 +60,8 @@ export class Devices {
 ```
 
 Optional pager theme — import it once from a global stylesheet:
-`@import '@mellowforge/items-grid-core/styles.css';`
+`@import '@mellowforge/items-grid-core/styles.css';` (theming and dark mode: the Styling
+section of the `@mellowforge/items-grid-core` README).
 
 `[mfItemsGridItemOf]` is only for typing: with `strictTemplates`, `let-device` is then a
 `Device`; without it, `let-device` is `any`. A grid without an item template renders empty

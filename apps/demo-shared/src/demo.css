@@ -29,7 +29,8 @@
   --on-accent: #ffffff;
   --shadow: rgb(16 24 40 / 0.08);
   --radius: 10px;
-  /* Follows the OS; the library pager follows the same color-scheme. */
+  /* Follows the OS. The pager accent is themed from --accent below, which replaces the
+     library's light-dark() default. */
   color-scheme: light dark;
   font-family:
     Inter,
