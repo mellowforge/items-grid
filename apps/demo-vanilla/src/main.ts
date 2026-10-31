@@ -91,7 +91,7 @@ function createCard(entity: Entity, size: CardSize): HTMLElement {
 
   const header = element('header', 'card__header');
   const titles = element('div', 'card__titles');
-  titles.append(element('h3', 'card__title', entity.title));
+  titles.append(element('h2', 'card__title', entity.title));
   if (view.showSubtitle) titles.append(element('p', 'card__subtitle', entity.subtitle));
   const badge = element('span', `badge badge--${entity.status}`);
   badge.dataset['field'] = 'badge';

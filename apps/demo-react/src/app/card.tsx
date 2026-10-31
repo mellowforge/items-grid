@@ -16,7 +16,7 @@ export function Card({
     <article className={`card card--${size}`} data-id={entity.id}>
       <header className="card__header">
         <div className="card__titles">
-          <h3 className="card__title">{entity.title}</h3>
+          <h2 className="card__title">{entity.title}</h2>
           {view.showSubtitle ? <p className="card__subtitle">{entity.subtitle}</p> : null}
         </div>
         <span className={`badge badge--${entity.status}`}>

@@ -11,7 +11,7 @@ import { type CardSize, cardView, type Entity } from 'demo-shared';
   template: `
     <header class="card__header">
       <div class="card__titles">
-        <h3 class="card__title">{{ entity().title }}</h3>
+        <h2 class="card__title">{{ entity().title }}</h2>
         @if (view().showSubtitle) {
           <p class="card__subtitle">{{ entity().subtitle }}</p>
         }
