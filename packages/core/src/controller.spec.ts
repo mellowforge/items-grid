@@ -1199,3 +1199,168 @@ describe('ItemsGridController — callbacks that never settle', () => {
     expect(() => controller.goTo(0)).not.toThrow();
   });
 });
+
+describe('ItemsGridController — all-or-nothing inputs', () => {
+  /** A grid whose page announcement throws while `fail.page` is set. */
+  const failing = (options: Partial<ItemsGridOptions<Entity>> = {}) => {
+    const fail = { page: false, key: false };
+    const controller = setup({
+      getKey: item => {
+        if (fail.key) throw new Error('bad key');
+        return item.id;
+      },
+      messages: {
+        page: info => {
+          if (fail.page) throw new Error('bad message');
+          return `Page ${info.pageIndex + 1}`;
+        },
+      },
+      ...options,
+    });
+    return { controller, fail };
+  };
+
+  it('restores the stable snapshot when a navigating setOptions throws', () => {
+    const { controller, fail } = failing({ reflow: 'stable' });
+    fail.page = true;
+    expect(() => controller.setOptions({ pageIndex: 1 })).toThrow('bad message');
+    fail.page = false;
+    // An item arrives before the page: the frozen page 1 still shows its own cards.
+    controller.setOptions({ items: [...entities(1, 1000), ...entities(120)] });
+    expect(controller.getState().pageIndex).toBe(0);
+    expect(ids(controller.getState().items)).toEqual(ids(entities(12)));
+  });
+
+  it('keeps the page and the anchor when goTo throws', () => {
+    const { controller, fail } = failing();
+    fail.page = true;
+    expect(() => controller.goTo(3)).toThrow('bad message');
+    fail.page = false;
+    controller.setOptions({ items: entities(119) });
+    expect(controller.getState().pageIndex).toBe(0);
+    controller.setViewportSize(NARROW);
+    expect(controller.getState().pageIndex).toBe(0);
+  });
+
+  it('keeps the viewport when setViewportSize throws', () => {
+    const { controller, fail } = failing();
+    controller.goTo(2);
+    fail.page = true;
+    expect(() => controller.setViewportSize(NARROW)).toThrow('bad message');
+    fail.page = false;
+    expect(controller.getState().pageSize).toBe(12);
+    controller.setOptions({ align: 'center' });
+    expect(controller.getState()).toMatchObject({ pageSize: 12, pageIndex: 2 });
+    // The same size reported again applies.
+    controller.setViewportSize(NARROW);
+    expect(controller.getState().pageSize).toBe(9);
+  });
+
+  it('keeps the row height when setMeasuredRowHeight throws', () => {
+    const { controller, fail } = failing({ measureRowHeight: true });
+    controller.goTo(1);
+    fail.page = true;
+    expect(() => controller.setMeasuredRowHeight(300)).toThrow('bad message');
+    fail.page = false;
+    controller.setOptions({ align: 'center' });
+    expect(controller.getState().geometry).toMatchObject({ rowHeight: 160, rows: 3 });
+    // The same height reported again applies.
+    controller.setMeasuredRowHeight(300);
+    expect(controller.getState().geometry).toMatchObject({ rowHeight: 300, rows: 1 });
+  });
+
+  it('keeps the stable server baseline when refresh throws', () => {
+    const { controller, fail } = failing({
+      mode: 'server',
+      reflow: 'stable',
+      items: entities(12),
+      total: 120,
+    });
+    controller.setOptions({ total: 125 });
+    expect(controller.getState().pendingCount).toBe(5);
+    fail.key = true;
+    expect(() => controller.refresh()).toThrow('bad key');
+    fail.key = false;
+    controller.setOptions({ loading: true });
+    expect(controller.getState().pendingCount).toBe(5);
+  });
+});
+
+describe('ItemsGridController — a throwing onPageRequest', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  it('is not re-sent unless the app asks again', () => {
+    const requests: number[] = [];
+    let fail = false;
+    const controller: ItemsGridController<Entity> = setup({
+      mode: 'server',
+      items: entities(12),
+      total: 120,
+      onPageRequest: request => {
+        requests.push(request.pageIndex);
+        if (fail) {
+          // The app starts loading, then its fetch throws synchronously.
+          controller.setOptions({ loading: true });
+          throw new Error('offline');
+        }
+      },
+    });
+    fail = true;
+    expect(() => controller.goTo(2)).toThrow('offline');
+    fail = false;
+    vi.advanceTimersByTime(1000);
+    controller.setOptions({ loading: false });
+    vi.advanceTimersByTime(1000);
+    expect(requests.filter(page => page === 2)).toHaveLength(1);
+
+    controller.refresh();
+    expect(requests.filter(page => page === 2)).toHaveLength(2);
+  });
+
+  it('forgets the failure once a later request goes through', () => {
+    const requests: PageRequest[] = [];
+    let fail = false;
+    const controller = setup({
+      mode: 'server',
+      items: entities(12),
+      total: 120,
+      onPageRequest: request => {
+        requests.push(request);
+        if (fail) throw new Error('offline');
+      },
+    });
+    fail = true;
+    expect(() => controller.goTo(2)).toThrow('offline');
+    fail = false;
+    controller.setViewportSize(NARROW);
+    vi.advanceTimersByTime(1000);
+    controller.setViewportSize(WIDE);
+    vi.advanceTimersByTime(1000);
+    expect(requests.slice(-2)).toEqual([
+      { pageIndex: 2, pageSize: 9 },
+      { pageIndex: 2, pageSize: 12 },
+    ]);
+  });
+
+  it('still sends the next page size after a failure', () => {
+    const requests: PageRequest[] = [];
+    let fail = false;
+    const controller = setup({
+      mode: 'server',
+      items: entities(12),
+      total: 120,
+      onPageRequest: request => {
+        requests.push(request);
+        if (fail) throw new Error('offline');
+      },
+    });
+    fail = true;
+    expect(() => controller.goTo(2)).toThrow('offline');
+    fail = false;
+    controller.setViewportSize(NARROW);
+    vi.advanceTimersByTime(1000);
+    expect(requests.at(-1)).toEqual({ pageIndex: 2, pageSize: 9 });
+  });
+});

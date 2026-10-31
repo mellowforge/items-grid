@@ -15,6 +15,12 @@ import {
   useSyncExternalStore,
 } from 'react';
 
+/**
+ * `useLayoutEffect` in the browser, `useEffect` on the server: neither runs there, but React 18
+ * warns about every layout effect it renders on the server (e.g. Next.js client components).
+ */
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
 /** What {@link useItemsGrid} returns. */
 export interface UseItemsGridResult<T> {
   /** Navigation (`next()`, `goTo()`…), `refresh()` and state; the hook owns the inputs. */
@@ -39,12 +45,12 @@ export interface UseItemsGridResult<T> {
  */
 export function useItemsGrid<T>(options: ItemsGridOptions<T>): UseItemsGridResult<T> {
   const latest = useRef(options);
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     latest.current = options;
   });
 
   const [controller] = useState(() => new ItemsGridController<T>(options));
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     controller.setOptions({
       getKey: item => latest.current.getKey(item),
       onPageRequest: request => latest.current.onPageRequest?.(request),
@@ -73,7 +79,7 @@ export function useItemsGrid<T>(options: ItemsGridOptions<T>): UseItemsGridResul
     pageIndex,
     requestDebounceMs,
   } = options;
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     controller.setOptions({
       items,
       mode,
@@ -115,14 +121,14 @@ export function useItemsGrid<T>(options: ItemsGridOptions<T>): UseItemsGridResul
   );
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const viewport = viewportRef.current;
     return viewport ? observeSize(viewport, size => controller.setViewportSize(size)) : undefined;
   }, [controller]);
 
   const probeRef = useRef<HTMLDivElement | null>(null);
   const hasProbe = state.probeItem !== undefined;
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const probe = probeRef.current;
     if (!hasProbe || !probe) {
       return undefined;

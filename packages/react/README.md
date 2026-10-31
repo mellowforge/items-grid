@@ -74,6 +74,10 @@ and on failure clear `loading` and the page's `items` and offer a retry with
 `grid.current?.refresh()`. Invalid options throw during render: wrap the grid in an error
 boundary if they can come from user input.
 
+On the server (e.g. Next.js client components) the grid renders its empty viewport without
+layout effects, so React 18 logs no `useLayoutEffect` warning; it measures and fills its
+pages after hydration.
+
 ### Imperative API and app chrome
 
 The `ref` receives an `ItemsGridHandle` (`next()`, `goTo()`, `refresh()`, `getState()`, …).

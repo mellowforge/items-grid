@@ -376,6 +376,8 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   /** Server stable mode: the known total when the page was frozen. */
   private _baselineTotal: number | null = null;
   private _lastRequest: PageRequest | null = null;
+  /** The request whose `onPageRequest` threw: not re-sent until the app asks again. */
+  private _failedRequest: PageRequest | null = null;
   private _requestTimer: ReturnType<typeof setTimeout> | null = null;
   private _announcement = '';
   private _state: ItemsGridState<T>;
@@ -424,57 +426,68 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     const next = normalize({ ...previous, ...patch });
     validate(next);
 
-    // Everything below is undone if deriving the new state throws (e.g. a throwing getKey).
-    const restore = this._checkpoint();
-    this._options = next;
-    const modeChanged = (previous.mode ?? 'client') !== (next.mode ?? 'client');
-    if (modeChanged) {
-      // A new data source: forget the last request (the 'mode' sync requests or cancels).
-      this._lastRequest = null;
-    }
-    if (modeChanged || previous.reflow !== next.reflow) {
-      this._snapshot = null;
-      this._baselineTotal = null;
-    }
-    // A changed pageIndex navigates in the same sync (one request, one report).
-    const navigated =
-      next.pageIndex !== undefined &&
-      next.pageIndex !== previous.pageIndex &&
-      Math.floor(next.pageIndex) !== this._state.pageIndex;
-    if (navigated) {
-      this._moveTo(next.pageIndex!);
-    }
-
-    let cause: SyncCause = 'options';
-    if (modeChanged) {
-      cause = 'mode';
-    } else if (navigated) {
-      cause = 'navigate';
-    }
-    let errors: readonly Caught[];
-    try {
-      errors = this._sync(cause, navigated);
-    } catch (error) {
-      restore();
-      throw error;
-    }
+    const errors = this._apply(() => {
+      this._options = next;
+      const modeChanged = (previous.mode ?? 'client') !== (next.mode ?? 'client');
+      if (modeChanged) {
+        // A new data source: forget the last request (the 'mode' sync requests or cancels).
+        this._lastRequest = null;
+        this._failedRequest = null;
+      }
+      if (modeChanged || previous.reflow !== next.reflow) {
+        this._snapshot = null;
+        this._baselineTotal = null;
+      }
+      // A changed pageIndex navigates in the same sync (one request, one report).
+      const navigated =
+        next.pageIndex !== undefined &&
+        next.pageIndex !== previous.pageIndex &&
+        Math.floor(next.pageIndex) !== this._state.pageIndex;
+      if (navigated) {
+        this._moveTo(next.pageIndex!);
+      }
+      if (modeChanged) return { cause: 'mode', navigated };
+      return { cause: navigated ? 'navigate' : 'options', navigated };
+    });
     optionsRevisions.set(this, getOptionsRevision(this) + 1);
     rethrow(errors);
   }
 
-  /** Captures the options and paging bookkeeping; the returned function puts them back. */
+  /**
+   * Applies an input change and syncs. If deriving the new state throws (app code such as
+   * `getKey` or `messages` runs during it), every input and piece of paging bookkeeping is
+   * put back, so no half-applied input survives into the next sync.
+   */
+  private _apply(change: () => { cause: SyncCause; navigated?: boolean }): readonly Caught[] {
+    const restore = this._checkpoint();
+    const { cause, navigated = false } = change();
+    try {
+      return this._sync(cause, navigated);
+    } catch (error) {
+      restore();
+      throw error;
+    }
+  }
+
+  /** Captures the inputs and paging bookkeeping; the returned function puts them back. */
   private _checkpoint(): () => void {
     const options = this._options;
+    const viewport = this._viewport;
+    const measuredRowHeight = this._measuredRowHeight;
     const snapshot = this._snapshot;
     const baselineTotal = this._baselineTotal;
     const lastRequest = this._lastRequest;
+    const failedRequest = this._failedRequest;
     const pageIndex = this._pageIndex;
     const anchorIndex = this._anchorIndex;
     return () => {
       this._options = options;
+      this._viewport = viewport;
+      this._measuredRowHeight = measuredRowHeight;
       this._snapshot = snapshot;
       this._baselineTotal = baselineTotal;
       this._lastRequest = lastRequest;
+      this._failedRequest = failedRequest;
       this._pageIndex = pageIndex;
       this._anchorIndex = anchorIndex;
     };
@@ -491,20 +504,34 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     }
   }
 
-  /** Reports the viewport's content-box size. Adapters wire this to a ResizeObserver. */
+  /**
+   * Reports the viewport's content-box size. Adapters wire this to a ResizeObserver.
+   * If app code throws during the update, the previous size stays in place.
+   */
   setViewportSize(size: ViewportSize): void {
-    this._viewport = { width: size.width, height: size.height };
-    rethrow(this._sync('viewport'));
+    rethrow(
+      this._apply(() => {
+        this._viewport = { width: size.width, height: size.height };
+        return { cause: 'viewport' };
+      })
+    );
   }
 
-  /** Reports the measured card height, or `null` to fall back to the preset's. */
+  /**
+   * Reports the measured card height, or `null` to fall back to the preset's. If app code
+   * throws during the update, the previous height stays in place.
+   */
   setMeasuredRowHeight(height: number | null): void {
     const next = height !== null && Number.isFinite(height) && height > 0 ? height : null;
     if (next === this._measuredRowHeight) {
       return;
     }
-    this._measuredRowHeight = next;
-    rethrow(this._sync('measure'));
+    rethrow(
+      this._apply(() => {
+        this._measuredRowHeight = next;
+        return { cause: 'measure' };
+      })
+    );
   }
 
   // MARK: - Navigation (bound, so they can be passed around)
@@ -514,12 +541,18 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
    * total is unknown). Re-freezes a stable page. Before the grid is measured (or while it is
    * hidden) the page is remembered and applied at the next layout.
    *
+   * If app code throws during the update, the grid stays on its page.
+   *
    * @throws an `items-grid:` error for a non-finite `pageIndex`.
    */
   readonly goTo = (pageIndex: number): void => {
     if (!Number.isFinite(pageIndex)) throw invalid('pageIndex', pageIndex);
-    this._moveTo(pageIndex);
-    rethrow(this._sync('navigate'));
+    rethrow(
+      this._apply(() => {
+        this._moveTo(pageIndex);
+        return { cause: 'navigate' };
+      })
+    );
   };
 
   readonly next = (): void => {
@@ -540,10 +573,11 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
 
   /**
    * Stable mode: shows the current data and clears `pendingCount`.
-   * Server mode: requests the current page again (also the way to retry a failed fetch).
+   * Server mode: requests the current page again (also the way to retry a failed fetch,
+   * including a request whose `onPageRequest` threw).
    */
   readonly refresh = (): void => {
-    rethrow(this._sync('refresh'));
+    rethrow(this._apply(() => ({ cause: 'refresh' })));
   };
 
   /**
@@ -586,6 +620,7 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   destroy(): void {
     this._cancelRequest();
     this._lastRequest = null;
+    this._failedRequest = null;
     // Nothing owed survives: a sync that a subscriber destroyed runs no effects.
     this._owedRequest = null;
     this._reportedPageIndex = this._state.pageIndex;
@@ -928,6 +963,11 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   // MARK: - Server requests
 
   private _request(request: PageRequest, immediate: boolean, force: boolean): void {
+    if (!immediate && !force && sameRequest(this._failedRequest, request)) {
+      // The app's onPageRequest threw for this page; only navigation or refresh() retries it.
+      this._cancelRequest();
+      return;
+    }
     if (sameRequest(this._lastRequest, request) && !force) {
       if (immediate) {
         this._cancelRequest();
@@ -958,7 +998,8 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     if (
       this._options.mode !== 'server' ||
       pageSize <= 0 ||
-      sameRequest(this._lastRequest, request)
+      sameRequest(this._lastRequest, request) ||
+      sameRequest(this._failedRequest, request)
     ) {
       return;
     }
@@ -971,10 +1012,13 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     try {
       this._options.onPageRequest?.(request);
     } catch (error) {
-      // Not sent after all: asking for the same page again must retry it.
+      // Not sent after all: navigating to the page or refresh() must retry it, but the grid
+      // does not re-send it on its own (e.g. when the failing callback also set `loading`).
       if (this._lastRequest === request) this._lastRequest = previous;
+      this._failedRequest = request;
       throw error;
     }
+    this._failedRequest = null;
   }
 
   private _cancelRequest(): void {
