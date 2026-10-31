@@ -1,4 +1,4 @@
-import '@mellowforge/items-grid-core/styles.css'; // optional pager theme
+import '@mellowforge/items-grid-core/styles.css'; // optional pager and focus-ring theme
 
 import { ItemsGrid } from '@mellowforge/items-grid-react';
 

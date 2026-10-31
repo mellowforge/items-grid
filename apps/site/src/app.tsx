@@ -21,14 +21,14 @@ const FEATURES: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Realtime without the jumps',
-    body: 'Live reflow, or a stable page that keeps its cards and counts the “N new items” for your banner. Cards keep their DOM by key, so switches and focus survive.',
+    body: 'Live reflow, or a stable page that keeps its cards and counts the “N new items” for your banner. Cards keep their DOM by key, so switches and focus survive updates.',
   },
   {
     title: 'Accessible',
     body: 'List semantics, a polite live region, a labelled pager, PageUp / PageDown — and opt-in arrow keys that move between cards without stealing keys from their controls.',
   },
   {
-    title: 'Headless, zero dependencies',
+    title: 'Headless, zero-dependency core',
     body: 'A pure engine with a vanilla mount and thin React and Angular adapters. You render the cards; the library never ships card markup or card styles.',
   },
 ];
@@ -75,7 +75,7 @@ export function App(): ReactElement {
       <main id="main">
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-copy">
-            <p className="eyebrow">Headless · React · Angular · zero dependencies</p>
+            <p className="eyebrow">Headless · React · Angular · zero-dependency core</p>
             <h1 id="hero-title">
               Card grids that <em>fit the screen</em> exactly.
             </h1>
@@ -84,9 +84,10 @@ export function App(): ReactElement {
               only — pages the rest, and keeps your place when the window, the sidebar or the data
               changes. You bring the cards.
             </p>
-            <CopyCommand command="npm install @mellowforge/items-grid-react" />
+            <CopyCommand command="npm install @mellowforge/items-grid-core @mellowforge/items-grid-react" />
             <p className="hint">
-              or <code>items-grid-angular</code>, or <code>items-grid-core</code> on its own
+              or <code>items-grid-angular</code> instead of <code>-react</code>, or{' '}
+              <code>items-grid-core</code> on its own
             </p>
             <div className="cta">
               <a className="button primary" href="react/">

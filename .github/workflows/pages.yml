@@ -9,8 +9,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -21,6 +19,9 @@ jobs:
     # Only the canonical repository publishes; forks would fail without Pages enabled.
     if: github.repository == 'mellowforge/items-grid'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read # configure-pages reads the site's base path
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -50,6 +51,10 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # Only the deploy job may publish; the build job (pnpm install, build tools) stays read-only.
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

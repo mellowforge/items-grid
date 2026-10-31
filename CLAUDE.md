@@ -27,7 +27,7 @@ apps/demo-react, apps/demo-angular  source-linked mirrors of each other
 ## Architecture invariants
 
 - **The core stays headless**: no framework imports, no runtime dependencies. `engine/` is pure; `ItemsGridController` touches no DOM (SSR-safe). Only `dom/` uses browser APIs.
-- **Geometry is the single source of truth**: `computeGeometry` returns `null` until measured (never a page size of 0); views apply `getViewportStyle(state)` inline so layout never depends on a stylesheet. The viewport's height must come from its host, never from its content.
+- **Geometry is the single source of truth**: `computeGeometry` returns `null` until measured (never a page size of 0); views apply `getViewportStyle(state)` inline so layout never depends on a stylesheet. The viewport's height must come from its host, never from its content. The pager sits below the viewport, so its height must not depend on its content either (one line, the status truncates — `styles/items-grid.css.spec.ts`): its width follows the page size, and a wrapping pager made the grid flip between two page sizes every frame.
 - **Grid only**: no card markup or card styles ship from `packages/`. Sample cards live in `apps/`.
 - **Identity**: `getKey(item)` takes no index; card DOM is keyed by it in every renderer.
 - **Anchor**: resizes and preset changes reanchor on the index of the first card at the last navigation; the anchor survives the viewport being hidden.

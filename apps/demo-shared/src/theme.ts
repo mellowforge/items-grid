@@ -1,6 +1,6 @@
 export type Theme = 'light' | 'dark';
 
-/** Shared by the landing page and the demos — one origin, so one choice carries over. */
+/** Shared by the landing page and the demos: on the deployed site they are one origin, so one choice carries over. */
 const STORAGE_KEY = 'items-grid-demo-theme';
 
 function storedTheme(): Theme | null {
@@ -13,7 +13,7 @@ function storedTheme(): Theme | null {
   }
 }
 
-/** The theme the page shows right now: the stored choice, else the OS preference. */
+/** The theme to start from: the stored choice, else the OS preference. */
 export function currentTheme(): Theme {
   return (
     storedTheme() ??

@@ -25,13 +25,13 @@
 
 Dashboards keep rebuilding the same grid of entity cards — devices, jobs, services, accounts — and keep getting the same two things wrong: rows of uneven height, and pages that leave a half-visible row or an inner scrollbar. items-grid moves that logic into one place. **It measures the space it is given, shows exactly as many full rows and columns as fit, and pages the rest.** You render the cards; the library never ships card markup.
 
-- **Exact fit** — `cols × rows` cards per page, never a partial row, never an inner scrollbar. A row height per size preset, or measured once from a sample card.
+- **Exact fit** — `cols × rows` cards per page, never a partial row, never an inner scrollbar. A row height per size preset, or measured from a sample card (and re-measured when it resizes).
 - **Keeps your place** — resizes, sidebars and preset changes recompute the page around the first card you were looking at, instead of jumping back to page 1.
 - **Size presets** — `compact`, `normal`, `large` or your own, with `maxColumns` and `maxPageSize` caps.
 - **Client or server paging** — slice an array, or ask your API for `{ pageIndex, pageSize }`: debounced while a window is dragged, deduplicated, with unknown totals supported.
-- **Realtime without the jumps** — live reflow, or a stable page that keeps its cards and counts “N new items” for your banner. Cards keep their DOM by key, so switches and focus survive updates.
-- **Accessible** — list semantics, a polite live region, a labelled pager, PageUp / PageDown, and opt-in arrow keys between cards that leave card controls their own keys. The demos score 100 in Lighthouse accessibility.
-- **Headless, zero dependencies** — a pure engine with a vanilla mount and thin React and Angular adapters, in parity. SSR-safe.
+- **Realtime without the jumps** — live reflow, or a stable page that keeps its cards and counts “N new items” for your banner. Cards keep their DOM by key, so switches and focus survive updates (in the vanilla mount, pass `updateItem` to patch a changed card in place).
+- **Accessible** — list semantics, a polite live region, a labelled pager, PageUp / PageDown, and opt-in arrow keys between cards that leave card controls their own keys.
+- **Headless, zero dependencies** — a pure, zero-dependency engine with a vanilla mount and thin React and Angular adapters, in parity. The core and the React adapter render on the server.
 
 ## Packages
 
@@ -53,19 +53,20 @@ npm install @mellowforge/items-grid-core                                   # any
 
 Keep every `@mellowforge/items-grid-*` package on the same version — they are released in lockstep.
 
-| Peer dependency                    | Needed by                                        |
-| ---------------------------------- | ------------------------------------------------ |
-| `react`, `react-dom`               | `@mellowforge/items-grid-react` (`^18 \|\| ^19`) |
-| `@angular/core`, `@angular/common` | `@mellowforge/items-grid-angular` (`>=22`)       |
+| Peer dependency                    | Needed by                                           |
+| ---------------------------------- | --------------------------------------------------- |
+| `@mellowforge/items-grid-core`     | both adapters (`0.x` — keep it on the same version) |
+| `react`, `react-dom`               | `@mellowforge/items-grid-react` (`^18 \|\| ^19`)    |
+| `@angular/core`, `@angular/common` | `@mellowforge/items-grid-angular` (`>=22`)          |
 
 ## Quick start
 
-Give the grid a container with a **definite height** from your layout (e.g. `flex: 1; min-height: 0` in a flex column), your items, a `getKey` and a card template. The optional stylesheet only themes the pager.
+Give the grid a container with a **definite height** from your layout (e.g. `flex: 1; min-height: 0` in a flex column), your items, a `getKey` and a card template. The optional stylesheet themes the pager and the focus ring of cards (with `arrowKeys`).
 
 ### React
 
 ```tsx
-import '@mellowforge/items-grid-core/styles.css'; // optional pager theme
+import '@mellowforge/items-grid-core/styles.css'; // optional pager and focus-ring theme
 
 import { ItemsGrid } from '@mellowforge/items-grid-react';
 
@@ -147,12 +148,12 @@ export class Devices {
 }
 ```
 
-Import the pager theme once from a global stylesheet: `@import '@mellowforge/items-grid-core/styles.css';`.
+Import the optional theme once from a global stylesheet: `@import '@mellowforge/items-grid-core/styles.css';`.
 
 ### Any framework, or none
 
 ```ts
-import '@mellowforge/items-grid-core/styles.css'; // optional pager theme
+import '@mellowforge/items-grid-core/styles.css'; // optional pager and focus-ring theme
 
 import { mountItemsGrid } from '@mellowforge/items-grid-core';
 
@@ -183,7 +184,8 @@ export function showDevices(container: HTMLElement, devices: Device[]) {
     arrowKeys: true,
     renderItem: renderDevice,
   });
-  // Realtime updates: pass a new array; cards keep their DOM by key.
+  // Realtime updates: pass a new array. Unchanged items keep their card; pass updateItem to
+  // patch a changed card in place.
   return (next: Device[]) => grid.update({ items: next });
 }
 ```
@@ -208,7 +210,7 @@ The grid measures only its own viewport (a `ResizeObserver`, one report per fram
 ## Compatibility
 
 - **React** 18 and 19, including server rendering (no layout-effect warnings; the grid fills in after hydration).
-- **Angular** 22+, zoneless, signal inputs; SSR-safe.
+- **Angular** 22+, signal inputs, zoneless-ready (zone.js not required).
 - **Browsers**: current Chrome, Edge, Firefox and Safari (`ResizeObserver`, CSS Grid). The pager theme's automatic dark accent needs `light-dark()`; older browsers keep the light accent.
 
 ## Limitations

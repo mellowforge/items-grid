@@ -35,8 +35,8 @@ jobs:
       - name: Build packages and apps
         run: pnpm build
 
-      # The deployed site (landing page + demos under /items-grid/): catches base-path breakage
-      # before pages.yml deploys it.
+      # The deployed site (landing page + demos under /items-grid/): catches base-path breakage on
+      # pull requests, before a merge lets pages.yml deploy it.
       - name: Build the Pages site
         run: pnpm build:pages
 

@@ -236,10 +236,11 @@ main {
 
 .copy-command code {
   flex: 1;
-  overflow: hidden;
+  min-width: 0;
   font-size: 13px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  line-height: 1.6;
+  /* Long installs wrap between package names rather than hide one. */
+  overflow-wrap: anywhere;
 }
 
 .copy-command .prompt {
@@ -289,7 +290,8 @@ main {
 }
 
 .hero-stage {
-  height: 476px;
+  /* Room for the tallest frame (HEIGHT.max, 460px) plus the padding. */
+  height: 486px;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -302,6 +304,8 @@ main {
   position: relative;
   display: flex;
   flex-direction: column;
+  /* Wide enough for the one-line pager's buttons (see BACKLOG: a compact pager). */
+  min-width: min(100%, 380px);
   max-width: 100%;
   padding: 10px;
   border: 1.5px dashed var(--accent);

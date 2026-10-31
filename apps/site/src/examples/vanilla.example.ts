@@ -1,4 +1,4 @@
-import '@mellowforge/items-grid-core/styles.css'; // optional pager theme
+import '@mellowforge/items-grid-core/styles.css'; // optional pager and focus-ring theme
 
 import { mountItemsGrid } from '@mellowforge/items-grid-core';
 
@@ -29,6 +29,7 @@ export function showDevices(container: HTMLElement, devices: Device[]) {
     arrowKeys: true,
     renderItem: renderDevice,
   });
-  // Realtime updates: pass a new array; cards keep their DOM by key.
+  // Realtime updates: pass a new array. Unchanged items keep their card; pass updateItem to
+  // patch a changed card in place.
   return (next: Device[]) => grid.update({ items: next });
 }

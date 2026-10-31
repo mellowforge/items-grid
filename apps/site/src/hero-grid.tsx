@@ -5,7 +5,7 @@ import { type PointerEvent, type ReactElement, useRef, useState } from 'react';
 
 const ITEMS = createEntities(240);
 /** Frame width, in % of the stage. */
-const WIDTH = { min: 40, max: 100, initial: 100 };
+const WIDTH = { min: 55, max: 100, initial: 100 };
 /** Frame height, in px. */
 const HEIGHT = { min: 200, max: 460, initial: 380 };
 
@@ -78,8 +78,13 @@ export function HeroGrid(): ReactElement {
 
   const onPointerMove = (event: PointerEvent<HTMLSpanElement>): void => {
     const start = drag.current;
-    const stageWidth = stage.current?.getBoundingClientRect().width;
-    if (!start || !stageWidth) return;
+    const element = stage.current;
+    if (!start || !element) return;
+    // The frame's width is a % of the stage's content box, not of its border box.
+    const style = getComputedStyle(element);
+    const stageWidth =
+      element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    if (stageWidth <= 0) return;
     setWidth(clamp(((start.width + event.clientX - start.x) / stageWidth) * 100, WIDTH));
     setHeight(clamp(start.height + event.clientY - start.y, HEIGHT));
   };

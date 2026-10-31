@@ -63,7 +63,7 @@ Adapters, `demo-vanilla` and the Angular library resolve core from `packages/cor
 6. Add a changeset (`pnpm changeset`) for any user-visible change to a published package, and update the READMEs.
 7. Use [Conventional Commits](https://www.conventionalcommits.org/) (`fix(core): …`, `feat(react): …`).
 
-CI must be green (format, build, lint, typecheck, tests, package check, Pages build) before merge.
+CI must be green (format, build, lint, typecheck, tests, hook tests, package check, Pages build) before merge.
 
 ## Releases
 

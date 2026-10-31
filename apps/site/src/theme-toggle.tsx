@@ -1,5 +1,5 @@
 import { applyTheme, currentTheme, restoreTheme, type Theme } from 'demo-shared';
-import { type ReactElement, useLayoutEffect, useState } from 'react';
+import { type ReactElement, useEffect, useLayoutEffect, useState } from 'react';
 
 /** Light/dark switch. Follows the OS until clicked; the choice carries over to the demos. */
 export function ThemeToggle(): ReactElement {
@@ -8,6 +8,15 @@ export function ThemeToggle(): ReactElement {
 
   useLayoutEffect(() => {
     restoreTheme();
+  }, []);
+
+  // Until the user picks one, the page follows the OS live: keep the label in step with it.
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return undefined;
+    const query = matchMedia('(prefers-color-scheme: dark)');
+    const follow = (): void => setTheme(currentTheme());
+    query.addEventListener?.('change', follow);
+    return () => query.removeEventListener?.('change', follow);
   }, []);
 
   const toggle = (): void => {

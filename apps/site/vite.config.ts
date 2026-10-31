@@ -29,7 +29,7 @@ export default defineConfig({
   optimizeDeps: { exclude: ['@mellowforge/items-grid-core', '@mellowforge/items-grid-react'] },
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.spec.tsx'],
+    include: ['src/**/*.spec.{ts,tsx}'],
     setupFiles: ['src/test-setup.ts'],
   },
 });
