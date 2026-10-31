@@ -439,17 +439,26 @@ class CustomPagerHostComponent {
   template: `
     <mf-items-grid [items]="items" [getKey]="getKey" [pager]="pager()">
       <ng-template mfItemsGridItem let-item>{{ item.name }}</ng-template>
-      <ng-template mfItemsGridPagerTemplate let-state let-grid="controller">
-        <button type="button" class="custom" (click)="grid.next()">
-          custom {{ state.pageIndex + 1 }} of {{ state.pageCount }}
-        </button>
-      </ng-template>
+      @if (custom()) {
+        <ng-template
+          mfItemsGridPagerTemplate
+          [mfItemsGridPagerTemplateOf]="items"
+          let-state
+          let-grid="controller"
+        >
+          <button type="button" class="custom" (click)="grid.next()">
+            custom {{ state.pageIndex + 1 }} of {{ state.pageCount }} from
+            {{ state.items[0]?.name }}
+          </button>
+        </ng-template>
+      }
     </mf-items-grid>
   `,
 })
 class PagerTemplateHostComponent {
   readonly items = entities(30);
   readonly pager = signal(true);
+  readonly custom = signal(true);
   readonly getKey = (item: Entity): number => item.id;
 }
 
@@ -462,20 +471,29 @@ describe('MfItemsGrid — composition', () => {
     flushFrames();
     await custom.whenStable();
     const customButton = (): HTMLButtonElement | null => root.querySelector('button.custom');
+    const label = (): string => customButton()!.textContent!.replace(/\s+/g, ' ').trim();
     expect(root.querySelector('mf-items-grid-pager')).toBeNull();
-    expect(customButton()!.textContent!.trim()).toBe('custom 1 of 3');
+    expect(label()).toBe('custom 1 of 3 from Entity 0');
     // The template sits between the viewport and the live region, like the built-in pager.
     const host = root.querySelector('mf-items-grid')!;
-    expect(
-      customButton()!.compareDocumentPosition(host.querySelector('.mf-items-grid__viewport')!),
-    ).toBe(Node.DOCUMENT_POSITION_PRECEDING);
+    const position = (selector: string): number =>
+      customButton()!.compareDocumentPosition(host.querySelector(selector)!);
+    expect(position('.mf-items-grid__viewport')).toBe(Node.DOCUMENT_POSITION_PRECEDING);
+    expect(position('.mf-items-grid__live')).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     customButton()!.click();
     await custom.whenStable();
-    expect(customButton()!.textContent!.trim()).toBe('custom 2 of 3');
+    expect(label()).toBe('custom 2 of 3 from Entity 12');
     expect(root.querySelector('[role="listitem"]')!.textContent!.trim()).toBe('Entity 12');
+    // A template that leaves the content gives the built-in pager back.
+    custom.componentInstance.custom.set(false);
+    await custom.whenStable();
+    expect(customButton()).toBeNull();
+    expect(root.querySelector('mf-items-grid-pager')).not.toBeNull();
+    custom.componentInstance.custom.set(true);
     custom.componentInstance.pager.set(false);
     await custom.whenStable();
     expect(customButton()).toBeNull();
+    expect(root.querySelector('mf-items-grid-pager')).toBeNull();
     custom.destroy();
   });
 

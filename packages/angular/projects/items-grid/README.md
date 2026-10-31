@@ -88,10 +88,16 @@ state — e.g. for a "5 new items" banner from `pendingCount`).
 `ng-template[mfItemsGridSkeleton]` (context: `$implicit` / `slot`),
 `ng-template[mfItemsGridEmpty]` and `ng-template[mfItemsGridPagerTemplate]` (context:
 `$implicit` / `state`, `controller`) — a custom pager rendered in place of the built-in one,
-below the cards and outside the measured viewport; `[pager]="false"` hides it too:
+below the cards and outside the measured viewport; `[pager]="false"` hides it too. Bind
+`[mfItemsGridPagerTemplateOf]` to the items to type `state.items` under strict templates:
 
 ```html
-<ng-template mfItemsGridPagerTemplate let-state let-grid="controller">
+<ng-template
+  mfItemsGridPagerTemplate
+  [mfItemsGridPagerTemplateOf]="devices()"
+  let-state
+  let-grid="controller"
+>
   <button type="button" [disabled]="!state.canNext" (click)="grid.next()">More</button>
 </ng-template>
 ```

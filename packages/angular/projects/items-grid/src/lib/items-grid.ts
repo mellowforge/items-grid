@@ -229,7 +229,7 @@ export class MfItemsGrid<T> {
   protected readonly itemDef = contentChild(MfItemsGridItem<T>);
   protected readonly skeletonDef = contentChild(MfItemsGridSkeleton);
   protected readonly emptyDef = contentChild(MfItemsGridEmpty);
-  protected readonly pagerDef = contentChild(MfItemsGridPagerTemplate);
+  protected readonly pagerDef = contentChild(MfItemsGridPagerTemplate<T>);
 
   private readonly _viewport = viewChild.required<ElementRef<HTMLElement>>('viewport');
   private readonly _probe = viewChild<ElementRef<HTMLElement>>('probe');

@@ -82,12 +82,13 @@ export class MfItemsGridEmpty {
 /**
  * A custom pager, rendered below the cards in place of the built-in `<mf-items-grid-pager>`
  * (`[pager]="false"` still hides it). Like the built-in pager it sits outside the viewport,
- * so the cards fit the space that is left.
+ * so the cards fit the space that is left. Bind `[mfItemsGridPagerTemplateOf]` to the grid's
+ * items to type `state.items` under strict templates.
  *
  * ```html
  * <mf-items-grid [items]="devices()" [getKey]="byId">
  *   <ng-template mfItemsGridItem let-device>…</ng-template>
- *   <ng-template mfItemsGridPagerTemplate let-state let-grid="controller">
+ *   <ng-template mfItemsGridPagerTemplate [mfItemsGridPagerTemplateOf]="devices()" let-state let-grid="controller">
  *     <button type="button" [disabled]="!state.canNext" (click)="grid.next()">More</button>
  *   </ng-template>
  * </mf-items-grid>
@@ -96,13 +97,16 @@ export class MfItemsGridEmpty {
 @Directive({
   selector: 'ng-template[mfItemsGridPagerTemplate]',
 })
-export class MfItemsGridPagerTemplate {
-  readonly template = inject<TemplateRef<MfItemsGridPagerContext<unknown>>>(TemplateRef);
+export class MfItemsGridPagerTemplate<T> {
+  /** Only for typing: the grid's items, so `let-state` is an `ItemsGridState<T>`. */
+  readonly mfItemsGridPagerTemplateOf = input<readonly T[] | undefined>(undefined);
 
-  static ngTemplateContextGuard(
-    _directive: MfItemsGridPagerTemplate,
+  readonly template = inject<TemplateRef<MfItemsGridPagerContext<T>>>(TemplateRef);
+
+  static ngTemplateContextGuard<T>(
+    _directive: MfItemsGridPagerTemplate<T>,
     _context: unknown,
-  ): _context is MfItemsGridPagerContext<unknown> {
+  ): _context is MfItemsGridPagerContext<T> {
     return true;
   }
 }
