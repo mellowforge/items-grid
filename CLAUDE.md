@@ -45,6 +45,6 @@ apps/demo-react, apps/demo-angular  source-linked mirrors of each other
 - TDD: write the failing spec, watch it fail for the right reason, then implement. A new adapter scenario goes into **both** adapter specs.
 - User-visible package changes need a changeset (packages are versioned together) and README updates.
 - Run the review gate in `.claude/rules/review-gate.md` per chunk. Deferred work goes to `BACKLOG.md`.
-- Never publish to npm or push tags; never commit to `main` directly. `.claude/hooks/block-raw-tooling.js` blocks publishing, tag pushes, npm installs, yarn and direct `vitest` in the Angular workspace (tests: `pnpm test:hooks`). Releases: `.claude/rules/release.md`.
+- Never publish to npm or push tags; never commit to `main` directly. `main` is protected by the "Protect main" ruleset (pull request, linear history, the CI check `Format, build, lint, test, package`, no force-push or deletion): push the chunk's branch, `gh pr create`, wait for CI, then `gh pr merge --rebase --delete-branch`. Admins may bypass only through a pull request — that is how the Version Packages PR, which gets no CI, is merged. `.claude/hooks/block-raw-tooling.js` blocks publishing, tag pushes, npm installs, yarn and direct `vitest` in the Angular workspace (tests: `pnpm test:hooks`). Releases: `.claude/rules/release.md`.
 
 @.claude/rules/review-gate.md
