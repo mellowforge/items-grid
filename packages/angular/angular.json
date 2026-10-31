@@ -10,7 +10,7 @@
       "projectType": "library",
       "root": "projects/items-grid",
       "sourceRoot": "projects/items-grid/src",
-      "prefix": "qf",
+      "prefix": "mf",
       "architect": {
         "build": {
           "builder": "@angular/build:ng-packagr",

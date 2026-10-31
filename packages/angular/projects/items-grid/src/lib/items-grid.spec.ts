@@ -3,9 +3,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import type { PageRequest, PagingMode } from '@mellowforge/items-grid-core';
 
 import { flushFrames, installLayoutStubs, ResizeObserverStub } from '../test-utils/resize-observer';
-import { QfItemsGrid } from './items-grid';
-import { QfItemsGridPager } from './items-grid-pager';
-import { QfItemsGridEmpty, QfItemsGridItem, QfItemsGridSkeleton } from './items-grid-templates';
+import { MfItemsGrid } from './items-grid';
+import { MfItemsGridPager } from './items-grid-pager';
+import { MfItemsGridEmpty, MfItemsGridItem, MfItemsGridSkeleton } from './items-grid-templates';
 
 interface Entity {
   id: number;
@@ -16,9 +16,9 @@ const entities = (count: number): Entity[] =>
   Array.from({ length: count }, (_, id) => ({ id, name: `Entity ${id}` }));
 
 @Component({
-  imports: [QfItemsGrid, QfItemsGridItem, QfItemsGridSkeleton, QfItemsGridEmpty],
+  imports: [MfItemsGrid, MfItemsGridItem, MfItemsGridSkeleton, MfItemsGridEmpty],
   template: `
-    <qf-items-grid
+    <mf-items-grid
       [items]="items()"
       [getKey]="getKey"
       [mode]="mode()"
@@ -34,7 +34,7 @@ const entities = (count: number): Entity[] =>
       (pageIndexChange)="pageChanges.push($event)"
       (stateChange)="lastPageSize = $event.pageSize"
     >
-      <ng-template qfItemsGridItem [qfItemsGridItemOf]="items()" let-item>
+      <ng-template mfItemsGridItem [mfItemsGridItemOf]="items()" let-item>
         <article>
           {{ item.name }}
           @if (withInput()) {
@@ -45,9 +45,9 @@ const entities = (count: number): Entity[] =>
           }
         </article>
       </ng-template>
-      <ng-template qfItemsGridSkeleton><div class="test-skeleton"></div></ng-template>
-      <ng-template qfItemsGridEmpty><p>No entities yet</p></ng-template>
-    </qf-items-grid>
+      <ng-template mfItemsGridSkeleton><div class="test-skeleton"></div></ng-template>
+      <ng-template mfItemsGridEmpty><p>No entities yet</p></ng-template>
+    </mf-items-grid>
   `,
 })
 class HostComponent {
@@ -66,14 +66,14 @@ class HostComponent {
   readonly pageChanges: number[] = [];
   lastPageSize = 0;
   readonly getKey = (item: Entity): number => item.id;
-  readonly grid = viewChild.required(QfItemsGrid<Entity>);
+  readonly grid = viewChild.required(MfItemsGrid<Entity>);
 }
 
 let fixture: ComponentFixture<HostComponent>;
 let host: HostComponent;
 let element: HTMLElement;
 
-const viewport = (): HTMLElement => element.querySelector('.qf-items-grid__viewport')!;
+const viewport = (): HTMLElement => element.querySelector('.mf-items-grid__viewport')!;
 const cards = (): string[] =>
   Array.from(element.querySelectorAll('[role="listitem"]')).map(
     (item) => item.textContent?.trim() ?? '',
@@ -110,7 +110,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('QfItemsGrid', () => {
+describe('MfItemsGrid', () => {
   it('renders exactly one page of cards once the viewport is measured (no manual detectChanges)', async () => {
     expect(cards()).toHaveLength(0);
     await layout();
@@ -123,7 +123,7 @@ describe('QfItemsGrid', () => {
     expect(viewport().getAttribute('aria-label')).toBe('Entities');
     expect(viewport().style.gridTemplateColumns).toBe('repeat(4, minmax(0, 1fr))');
     expect(viewport().style.gridAutoRows).toBe('160px');
-    expect(element.querySelector('qf-items-grid')!.classList).toContain('qf-items-grid');
+    expect(element.querySelector('mf-items-grid')!.classList).toContain('mf-items-grid');
   });
 
   it('pages with the pager buttons', async () => {
@@ -134,7 +134,7 @@ describe('QfItemsGrid', () => {
     expect(cards()[0]).toBe('Entity 12');
     await click(button('Page 3'));
     expect(cards()).toHaveLength(6);
-    expect(element.querySelector('.qf-items-grid-pager__status')!.textContent!.trim()).toBe(
+    expect(element.querySelector('.mf-items-grid-pager__status')!.textContent!.trim()).toBe(
       'Items 25–30 of 30',
     );
   });
@@ -180,7 +180,7 @@ describe('QfItemsGrid', () => {
   it('renders the empty template, and is not a list while empty', async () => {
     host.items.set([]);
     await layout();
-    expect(element.querySelector('.qf-items-grid__empty')!.textContent!.trim()).toBe(
+    expect(element.querySelector('.mf-items-grid__empty')!.textContent!.trim()).toBe(
       'No entities yet',
     );
     expect(viewport().hasAttribute('role')).toBe(false);
@@ -248,7 +248,7 @@ describe('QfItemsGrid', () => {
     host.total.set(120);
     await fixture.whenStable();
     expect(cards()).toHaveLength(12);
-    expect(element.querySelector('.qf-items-grid-pager__status')!.textContent!.trim()).toBe(
+    expect(element.querySelector('.mf-items-grid-pager__status')!.textContent!.trim()).toBe(
       'Items 1–12 of 120',
     );
     expect(button('Page 10')).toBeTruthy();
@@ -292,7 +292,7 @@ describe('QfItemsGrid', () => {
     host.mode.set('server');
     host.items.set(entities(12));
     await layout();
-    expect(element.querySelector('.qf-items-grid-pager__status')!.textContent!.trim()).toBe(
+    expect(element.querySelector('.mf-items-grid-pager__status')!.textContent!.trim()).toBe(
       'Items 1–12',
     );
     expect(button('Page 2')).toBeTruthy();
@@ -329,20 +329,20 @@ describe('QfItemsGrid', () => {
   });
 
   it('keeps the pager status blank until the grid is measured', () => {
-    expect(element.querySelector('.qf-items-grid-pager__status')!.textContent!.trim()).toBe('');
+    expect(element.querySelector('.mf-items-grid-pager__status')!.textContent!.trim()).toBe('');
   });
 
   it('does not warn about the item template when one is projected', async () => {
     const warn = vi.spyOn(console, 'warn');
     await layout();
-    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('qfItemsGridItem'));
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('mfItemsGridItem'));
     warn.mockRestore();
   });
 
   it('measures the row height from a hidden probe card', async () => {
     host.measure.set(true);
     await layout();
-    const probe = element.querySelector<HTMLElement>('.qf-items-grid__probe')!;
+    const probe = element.querySelector<HTMLElement>('.mf-items-grid__probe')!;
     expect(probe.getAttribute('aria-hidden')).toBe('true');
     ResizeObserverStub.for(probe).fire(280, 100, { inlineSize: 280, blockSize: 118 });
     flushFrames();
@@ -407,8 +407,8 @@ describe('QfItemsGrid', () => {
 });
 
 @Component({
-  imports: [QfItemsGrid],
-  template: `<qf-items-grid [items]="items" [getKey]="getKey" />`,
+  imports: [MfItemsGrid],
+  template: `<mf-items-grid [items]="items" [getKey]="getKey" />`,
 })
 class MissingTemplateHostComponent {
   readonly items = entities(3);
@@ -416,12 +416,12 @@ class MissingTemplateHostComponent {
 }
 
 @Component({
-  imports: [QfItemsGrid, QfItemsGridItem, QfItemsGridPager],
+  imports: [MfItemsGrid, MfItemsGridItem, MfItemsGridPager],
   template: `
-    <qf-items-grid #grid [items]="items" [getKey]="getKey" [pager]="false">
-      <ng-template qfItemsGridItem let-item>{{ item.name }}</ng-template>
-    </qf-items-grid>
-    <qf-items-grid-pager class="outside" [controller]="grid.controller" [state]="grid.state()" />
+    <mf-items-grid #grid [items]="items" [getKey]="getKey" [pager]="false">
+      <ng-template mfItemsGridItem let-item>{{ item.name }}</ng-template>
+    </mf-items-grid>
+    <mf-items-grid-pager class="outside" [controller]="grid.controller" [state]="grid.state()" />
   `,
 })
 class CustomPagerHostComponent {
@@ -429,12 +429,12 @@ class CustomPagerHostComponent {
   readonly getKey = (item: Entity): number => item.id;
 }
 
-describe('QfItemsGrid — composition', () => {
+describe('MfItemsGrid — composition', () => {
   it('warns when no item template is projected', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const missing = TestBed.createComponent(MissingTemplateHostComponent);
     await missing.whenStable();
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ng-template[qfItemsGridItem]'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ng-template[mfItemsGridItem]'));
     warn.mockRestore();
     missing.destroy();
   });
@@ -443,10 +443,10 @@ describe('QfItemsGrid — composition', () => {
     const custom = TestBed.createComponent(CustomPagerHostComponent);
     await custom.whenStable();
     const root: HTMLElement = custom.nativeElement;
-    ResizeObserverStub.for(root.querySelector('.qf-items-grid__viewport')!).fire(1318, 552);
+    ResizeObserverStub.for(root.querySelector('.mf-items-grid__viewport')!).fire(1318, 552);
     flushFrames();
     await custom.whenStable();
-    expect(root.querySelectorAll('qf-items-grid-pager')).toHaveLength(1);
+    expect(root.querySelectorAll('mf-items-grid-pager')).toHaveLength(1);
     root.querySelector<HTMLButtonElement>('.outside button[aria-label="Next page"]')!.click();
     await custom.whenStable();
     expect(root.querySelector('[role="listitem"]')!.textContent!.trim()).toBe('Entity 12');

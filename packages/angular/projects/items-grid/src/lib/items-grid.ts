@@ -37,8 +37,8 @@ import {
   type SizePreset,
 } from '@mellowforge/items-grid-core';
 
-import { QfItemsGridPager } from './items-grid-pager';
-import { QfItemsGridEmpty, QfItemsGridItem, QfItemsGridSkeleton } from './items-grid-templates';
+import { MfItemsGridPager } from './items-grid-pager';
+import { MfItemsGridEmpty, MfItemsGridItem, MfItemsGridSkeleton } from './items-grid-templates';
 
 /**
  * A card grid that fits its host exactly: the page holds as many full rows and columns as
@@ -46,22 +46,22 @@ import { QfItemsGridEmpty, QfItemsGridItem, QfItemsGridSkeleton } from './items-
  * your layout (e.g. `flex: 1` or `height: 100%`).
  *
  * ```html
- * <qf-items-grid [items]="devices()" [getKey]="byId" preset="compact">
- *   <ng-template qfItemsGridItem let-device><app-device-card [device]="device" /></ng-template>
- * </qf-items-grid>
+ * <mf-items-grid [items]="devices()" [getKey]="byId" preset="compact">
+ *   <ng-template mfItemsGridItem let-device><app-device-card [device]="device" /></ng-template>
+ * </mf-items-grid>
  * ```
  */
 @Component({
-  selector: 'qf-items-grid',
-  exportAs: 'qfItemsGrid',
-  imports: [NgTemplateOutlet, QfItemsGridPager],
-  host: { class: 'qf-items-grid', '[style]': 'hostStyle' },
+  selector: 'mf-items-grid',
+  exportAs: 'mfItemsGrid',
+  imports: [NgTemplateOutlet, MfItemsGridPager],
+  host: { class: 'mf-items-grid', '[style]': 'hostStyle' },
   template: `
     <!-- PageUp/PageDown bubble up from focused cards; the list itself is not a tab stop. -->
     <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -->
     <div
       #viewport
-      class="qf-items-grid__viewport"
+      class="mf-items-grid__viewport"
       [attr.role]="state().isEmpty ? null : 'list'"
       [attr.aria-label]="ariaLabel() ?? null"
       [attr.aria-busy]="state().loading ? 'true' : null"
@@ -71,7 +71,7 @@ import { QfItemsGridEmpty, QfItemsGridItem, QfItemsGridSkeleton } from './items-
       @if (state().loading && skeletonDef(); as skeleton) {
         @for (slot of skeletonSlots(); track slot) {
           <div
-            class="qf-items-grid__cell qf-items-grid__cell--skeleton"
+            class="mf-items-grid__cell mf-items-grid__cell--skeleton"
             [style]="cellStyle"
             aria-hidden="true"
           >
@@ -83,7 +83,7 @@ import { QfItemsGridEmpty, QfItemsGridItem, QfItemsGridSkeleton } from './items-
         }
       } @else {
         @for (item of state().items; track trackKey(item); let offset = $index) {
-          <div class="qf-items-grid__cell" [style]="cellStyle" role="listitem">
+          <div class="mf-items-grid__cell" [style]="cellStyle" role="listitem">
             <ng-container
               [ngTemplateOutlet]="itemDef()?.template ?? null"
               [ngTemplateOutletContext]="{
@@ -96,14 +96,14 @@ import { QfItemsGridEmpty, QfItemsGridItem, QfItemsGridSkeleton } from './items-
         }
       }
       @if (state().isEmpty && emptyDef(); as empty) {
-        <div class="qf-items-grid__empty" [style]="emptyStyle">
+        <div class="mf-items-grid__empty" [style]="emptyStyle">
           <ng-container [ngTemplateOutlet]="empty.template" />
         </div>
       }
       @if (probeItem(); as probe) {
         <div
           #probe
-          class="qf-items-grid__cell qf-items-grid__probe"
+          class="mf-items-grid__cell mf-items-grid__probe"
           [style]="probeStyle()"
           aria-hidden="true"
         >
@@ -115,18 +115,18 @@ import { QfItemsGridEmpty, QfItemsGridItem, QfItemsGridSkeleton } from './items-
       }
     </div>
     @if (pager()) {
-      <qf-items-grid-pager
+      <mf-items-grid-pager
         [controller]="controller"
         [state]="state()"
         [labels]="pagerLabels() ?? undefined"
       />
     }
-    <div class="qf-items-grid__live" [style]="liveStyle" aria-live="polite">
+    <div class="mf-items-grid__live" [style]="liveStyle" aria-live="polite">
       {{ state().announcement }}
     </div>
   `,
 })
-export class QfItemsGrid<T> {
+export class MfItemsGrid<T> {
   // MARK: - Inputs
 
   /** Client mode: the whole dataset. Server mode: the current page. Replace, don't mutate. */
@@ -205,15 +205,15 @@ export class QfItemsGrid<T> {
 
   /**
    * Every new render state, for app chrome outside the grid (e.g. a "5 new items" banner
-   * from `pendingCount`). Inside a template, `#grid="qfItemsGrid"` + `grid.state()` also works.
+   * from `pendingCount`). Inside a template, `#grid="mfItemsGrid"` + `grid.state()` also works.
    */
   readonly stateChange = output<ItemsGridState<T>>();
 
   // MARK: - Templates & view
 
-  protected readonly itemDef = contentChild(QfItemsGridItem<T>);
-  protected readonly skeletonDef = contentChild(QfItemsGridSkeleton);
-  protected readonly emptyDef = contentChild(QfItemsGridEmpty);
+  protected readonly itemDef = contentChild(MfItemsGridItem<T>);
+  protected readonly skeletonDef = contentChild(MfItemsGridSkeleton);
+  protected readonly emptyDef = contentChild(MfItemsGridEmpty);
 
   private readonly _viewport = viewChild.required<ElementRef<HTMLElement>>('viewport');
   private readonly _probe = viewChild<ElementRef<HTMLElement>>('probe');
@@ -309,8 +309,8 @@ export class QfItemsGrid<T> {
     afterNextRender(() => {
       if (!this.itemDef()) {
         console.warn(
-          'items-grid: <qf-items-grid> has no ng-template[qfItemsGridItem], so its cards render ' +
-            'empty. Add one and import QfItemsGridItem into the component.',
+          'items-grid: <mf-items-grid> has no ng-template[mfItemsGridItem], so its cards render ' +
+            'empty. Add one and import MfItemsGridItem into the component.',
         );
       }
     });

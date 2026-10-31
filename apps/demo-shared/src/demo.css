@@ -38,9 +38,9 @@
   background: var(--bg);
 
   /* Library pager theme. */
-  --qf-items-grid-pager-current-color: var(--accent);
-  --qf-items-grid-pager-current-background: var(--accent-soft);
-  --qf-items-grid-focus-ring: var(--accent);
+  --mf-items-grid-pager-current-color: var(--accent);
+  --mf-items-grid-pager-current-background: var(--accent-soft);
+  --mf-items-grid-focus-ring: var(--accent);
 }
 
 *,

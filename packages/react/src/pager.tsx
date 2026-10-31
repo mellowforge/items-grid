@@ -21,7 +21,7 @@ export interface ItemsGridPagerProps {
 
 /**
  * The optional pager: status text, previous / next and a compact list of page buttons.
- * Unstyled apart from the `qf-items-grid-pager*` class hooks (see the core stylesheet).
+ * Unstyled apart from the `mf-items-grid-pager*` class hooks (see the core stylesheet).
  */
 export function ItemsGridPager({
   controller,

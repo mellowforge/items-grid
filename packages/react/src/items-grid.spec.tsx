@@ -29,7 +29,7 @@ function Grid(props: Partial<ItemsGridProps<Entity>> & { ref?: Ref<ItemsGridHand
   );
 }
 
-const viewport = (): HTMLElement => document.querySelector('.qf-items-grid__viewport')!;
+const viewport = (): HTMLElement => document.querySelector('.mf-items-grid__viewport')!;
 const cards = (): string[] => screen.queryAllByRole('listitem').map(item => item.textContent ?? '');
 
 /** Normal preset: 1318×552 → 4 × 3 = 12 per page; 976×552 → 3 × 3 = 9. */
@@ -144,7 +144,7 @@ describe('ItemsGrid', () => {
   it('measures the row height from a hidden probe card', () => {
     const { container } = render(<Grid measureRowHeight />);
     layout();
-    const probe = container.querySelector<HTMLElement>('.qf-items-grid__probe')!;
+    const probe = container.querySelector<HTMLElement>('.mf-items-grid__probe')!;
     expect(probe.getAttribute('aria-hidden')).toBe('true');
     act(() => {
       ResizeObserverStub.for(probe).fire(280, 100, { inlineSize: 280, blockSize: 118 });
@@ -327,7 +327,7 @@ describe('ItemsGrid', () => {
       </StrictMode>
     );
     layout();
-    const probe = container.querySelector('.qf-items-grid__probe')!;
+    const probe = container.querySelector('.mf-items-grid__probe')!;
     const live = () =>
       ResizeObserverStub.instances.filter(
         observer => !observer.disconnected && observer.observed.includes(probe)
@@ -412,7 +412,7 @@ describe('ItemsGrid', () => {
 
   it('keeps the pager status blank until the grid is measured', () => {
     const { container } = render(<Grid />);
-    expect(container.querySelector('.qf-items-grid-pager__status')!.textContent).toBe('');
+    expect(container.querySelector('.mf-items-grid-pager__status')!.textContent).toBe('');
   });
 
   it('works in StrictMode after the remount (state still updates)', () => {

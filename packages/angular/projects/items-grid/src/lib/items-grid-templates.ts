@@ -1,7 +1,7 @@
 import { Directive, inject, input, TemplateRef } from '@angular/core';
 
-/** Template context of `ng-template[qfItemsGridItem]`. */
-export interface QfItemsGridItemContext<T> {
+/** Template context of `ng-template[mfItemsGridItem]`. */
+export interface MfItemsGridItemContext<T> {
   /** The item; `let-item`. */
   $implicit: T;
   item: T;
@@ -9,8 +9,8 @@ export interface QfItemsGridItemContext<T> {
   index: number;
 }
 
-/** Template context of `ng-template[qfItemsGridSkeleton]`. */
-export interface QfItemsGridSkeletonContext {
+/** Template context of `ng-template[mfItemsGridSkeleton]`. */
+export interface MfItemsGridSkeletonContext {
   /** Zero-based slot on the page; `let-slot`. */
   $implicit: number;
   slot: number;
@@ -19,52 +19,52 @@ export interface QfItemsGridSkeletonContext {
 /**
  * The card template, rendered once per item on the current page.
  *
- * Bind `[qfItemsGridItemOf]` to the grid's items to type `let-item` under strict templates.
+ * Bind `[mfItemsGridItemOf]` to the grid's items to type `let-item` under strict templates.
  *
  * ```html
- * <qf-items-grid [items]="devices()" [getKey]="byId">
- *   <ng-template qfItemsGridItem [qfItemsGridItemOf]="devices()" let-device>
+ * <mf-items-grid [items]="devices()" [getKey]="byId">
+ *   <ng-template mfItemsGridItem [mfItemsGridItemOf]="devices()" let-device>
  *     <app-device-card [device]="device" />
  *   </ng-template>
- * </qf-items-grid>
+ * </mf-items-grid>
  * ```
  */
 @Directive({
-  selector: 'ng-template[qfItemsGridItem]',
+  selector: 'ng-template[mfItemsGridItem]',
 })
-export class QfItemsGridItem<T> {
+export class MfItemsGridItem<T> {
   /** Only for typing: the items the grid renders, so `let-item` is a `T`. */
-  readonly qfItemsGridItemOf = input<readonly T[] | undefined>(undefined);
+  readonly mfItemsGridItemOf = input<readonly T[] | undefined>(undefined);
 
-  readonly template = inject<TemplateRef<QfItemsGridItemContext<T>>>(TemplateRef);
+  readonly template = inject<TemplateRef<MfItemsGridItemContext<T>>>(TemplateRef);
 
   static ngTemplateContextGuard<T>(
-    _directive: QfItemsGridItem<T>,
+    _directive: MfItemsGridItem<T>,
     _context: unknown,
-  ): _context is QfItemsGridItemContext<T> {
+  ): _context is MfItemsGridItemContext<T> {
     return true;
   }
 }
 
 /** The skeleton card template, rendered once per slot while `loading`. */
 @Directive({
-  selector: 'ng-template[qfItemsGridSkeleton]',
+  selector: 'ng-template[mfItemsGridSkeleton]',
 })
-export class QfItemsGridSkeleton {
-  readonly template = inject<TemplateRef<QfItemsGridSkeletonContext>>(TemplateRef);
+export class MfItemsGridSkeleton {
+  readonly template = inject<TemplateRef<MfItemsGridSkeletonContext>>(TemplateRef);
 
   static ngTemplateContextGuard(
-    _directive: QfItemsGridSkeleton,
+    _directive: MfItemsGridSkeleton,
     _context: unknown,
-  ): _context is QfItemsGridSkeletonContext {
+  ): _context is MfItemsGridSkeletonContext {
     return true;
   }
 }
 
 /** The empty-state template, rendered over the whole viewport while `state().isEmpty`. */
 @Directive({
-  selector: 'ng-template[qfItemsGridEmpty]',
+  selector: 'ng-template[mfItemsGridEmpty]',
 })
-export class QfItemsGridEmpty {
+export class MfItemsGridEmpty {
   readonly template = inject<TemplateRef<unknown>>(TemplateRef);
 }

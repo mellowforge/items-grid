@@ -4,7 +4,7 @@ Run `/pr-review-toolkit:review-pr` per completed chunk, giving every agent `CLAU
 
 ## Required checks
 
-- **Public API discipline.** No unintended change to anything exported from a package entry point, or to any selector, input, output, prop, CSS class or `--qf-items-grid-*` property. Intended changes have TSDoc, a changeset and README updates.
+- **Public API discipline.** No unintended change to anything exported from a package entry point, or to any selector, input, output, prop, CSS class or `--mf-items-grid-*` property. Intended changes have TSDoc, a changeset and README updates.
 - **The core stays headless** and dependency-free; `engine/` and `controller.ts` use no DOM APIs.
 - **Exact fit.** No change may let a partial row show, make the viewport scroll, or derive the viewport's height from its content. Verify in a demo with chrome-devtools, not only in jsdom.
 - **Adapter parity.** A feature, fix, prop/input or output changed in one adapter is changed in the other, with a spec in both, or recorded in `BACKLOG.md` with the reason.

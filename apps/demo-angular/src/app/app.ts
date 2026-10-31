@@ -1,9 +1,9 @@
 import { Component, computed, effect, signal, viewChild } from '@angular/core';
 import {
-  QfItemsGrid,
-  QfItemsGridEmpty,
-  QfItemsGridItem,
-  QfItemsGridSkeleton,
+  MfItemsGrid,
+  MfItemsGridEmpty,
+  MfItemsGridItem,
+  MfItemsGridSkeleton,
 } from '@mellowforge/items-grid-angular';
 import type {
   GridAlign,
@@ -41,7 +41,7 @@ const NO_PAGE: ServerPage = { ids: [], total: undefined, loading: true };
 @Component({
   selector: 'app-root',
   host: { class: 'app' },
-  imports: [Card, Segmented, QfItemsGrid, QfItemsGridItem, QfItemsGridSkeleton, QfItemsGridEmpty],
+  imports: [Card, Segmented, MfItemsGrid, MfItemsGridItem, MfItemsGridSkeleton, MfItemsGridEmpty],
   template: `
     <header class="app__header">
       <span class="app__brand">Fleet Console</span>
@@ -101,7 +101,7 @@ const NO_PAGE: ServerPage = { ids: [], total: undefined, loading: true };
           Realtime
         </label>
       </div>
-      <qf-items-grid
+      <mf-items-grid
         class="app__grid"
         ariaLabel="Entities"
         [items]="items()"
@@ -115,7 +115,7 @@ const NO_PAGE: ServerPage = { ids: [], total: undefined, loading: true };
         (pageRequest)="onPageRequest($event)"
         (stateChange)="onStateChange($event)"
       >
-        <ng-template qfItemsGridItem [qfItemsGridItemOf]="items()" let-entity>
+        <ng-template mfItemsGridItem [mfItemsGridItemOf]="items()" let-entity>
           <article
             appCard
             [entity]="entity"
@@ -123,7 +123,7 @@ const NO_PAGE: ServerPage = { ids: [], total: undefined, loading: true };
             (toggled)="toggle(entity.id, $event)"
           ></article>
         </ng-template>
-        <ng-template qfItemsGridSkeleton>
+        <ng-template mfItemsGridSkeleton>
           <div class="skeleton-card">
             <div class="skeleton-card__group">
               <div class="skeleton-card__bar" style="width: 55%"></div>
@@ -135,13 +135,13 @@ const NO_PAGE: ServerPage = { ids: [], total: undefined, loading: true };
             </div>
           </div>
         </ng-template>
-        <ng-template qfItemsGridEmpty>
+        <ng-template mfItemsGridEmpty>
           <div class="empty-state">
             <p class="empty-state__title">No entities yet</p>
             <p class="empty-state__hint">They will appear here as soon as they report in.</p>
           </div>
         </ng-template>
-      </qf-items-grid>
+      </mf-items-grid>
     </main>
   `,
 })
@@ -160,7 +160,7 @@ export class App {
   protected readonly server = signal<ServerPage>(NO_PAGE);
   protected readonly pendingCount = signal(0);
   protected readonly loadError = signal(false);
-  protected readonly grid = viewChild.required(QfItemsGrid<Entity>);
+  protected readonly grid = viewChild.required(MfItemsGrid<Entity>);
 
   protected readonly getKey = (entity: Entity): string => entity.id;
 

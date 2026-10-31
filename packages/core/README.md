@@ -157,10 +157,10 @@ uses real buttons with labels and `aria-current="page"`.
 ## Styling
 
 Layout is applied inline; no stylesheet is required. `@mellowforge/items-grid-core/styles.css`
-is an optional, minimal pager theme. Theme it with `--qf-items-grid-*` custom properties set
+is an optional, minimal pager theme. Theme it with `--mf-items-grid-*` custom properties set
 anywhere up the tree (e.g. `:root`); every value has a fallback, so the pager also works when
-placed outside the grid. Class hooks: `qf-items-grid`, `qf-items-grid__viewport`, `__cell`,
-`__cell--skeleton`, `__empty`, `__probe`, `__live`, `qf-items-grid-pager`, `__status`,
+placed outside the grid. Class hooks: `mf-items-grid`, `mf-items-grid__viewport`, `__cell`,
+`__cell--skeleton`, `__empty`, `__probe`, `__live`, `mf-items-grid-pager`, `__status`,
 `__list`, `__button`, `__gap`.
 
 ## License

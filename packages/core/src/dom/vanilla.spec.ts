@@ -28,9 +28,9 @@ function mount(options: Partial<MountItemsGridOptions<Entity>> = {}): ItemsGridM
   return mounted;
 }
 
-const viewport = (): HTMLElement => container.querySelector('.qf-items-grid__viewport')!;
+const viewport = (): HTMLElement => container.querySelector('.mf-items-grid__viewport')!;
 const cells = (): HTMLElement[] =>
-  Array.from(viewport().querySelectorAll<HTMLElement>(':scope > .qf-items-grid__cell'));
+  Array.from(viewport().querySelectorAll<HTMLElement>(':scope > .mf-items-grid__cell'));
 const texts = (): string[] => cells().map(cell => cell.textContent ?? '');
 const button = (name: string): HTMLButtonElement =>
   Array.from(container.querySelectorAll('button')).find(
@@ -78,7 +78,7 @@ describe('mountItemsGrid', () => {
     layout();
     expect(viewport().style.gridTemplateColumns).toBe('repeat(4, minmax(0, 1fr))');
     expect(viewport().style.gridAutoRows).toBe('160px');
-    expect(container.classList.contains('qf-items-grid')).toBe(true);
+    expect(container.classList.contains('mf-items-grid')).toBe(true);
   });
 
   it('pages with the pager buttons', () => {
@@ -104,7 +104,7 @@ describe('mountItemsGrid', () => {
   it('shows the visible range in the pager status', () => {
     mount();
     layout();
-    expect(container.querySelector('.qf-items-grid-pager__status')!.textContent).toBe(
+    expect(container.querySelector('.mf-items-grid-pager__status')!.textContent).toBe(
       'Items 1–12 of 30'
     );
   });
@@ -181,7 +181,7 @@ describe('mountItemsGrid', () => {
       renderSkeleton: () => document.createElement('div'),
     });
     layout();
-    const skeletons = viewport().querySelectorAll('.qf-items-grid__cell--skeleton');
+    const skeletons = viewport().querySelectorAll('.mf-items-grid__cell--skeleton');
     expect(skeletons).toHaveLength(12);
     expect(skeletons[0]!.getAttribute('aria-hidden')).toBe('true');
     expect(viewport().getAttribute('aria-busy')).toBe('true');
@@ -197,13 +197,13 @@ describe('mountItemsGrid', () => {
       },
     });
     layout();
-    expect(container.querySelector('.qf-items-grid__empty')!.textContent).toBe('No entities yet');
+    expect(container.querySelector('.mf-items-grid__empty')!.textContent).toBe('No entities yet');
   });
 
   it('measures the row height from a hidden probe card', () => {
     mount({ measureRowHeight: true });
     layout();
-    const probe = container.querySelector<HTMLElement>('.qf-items-grid__probe')!;
+    const probe = container.querySelector<HTMLElement>('.mf-items-grid__probe')!;
     expect(probe.getAttribute('aria-hidden')).toBe('true');
     expect(probe.textContent).toBe('Entity 0');
     ResizeObserverStub.for(probe).fire(280, 118, { inlineSize: 280, blockSize: 118 });
@@ -287,7 +287,7 @@ describe('mountItemsGrid', () => {
     });
     layout();
     grid.update({ items: entities(12), total: 30, loading: false });
-    expect(viewport().querySelectorAll('.qf-items-grid__cell--skeleton')).toHaveLength(0);
+    expect(viewport().querySelectorAll('.mf-items-grid__cell--skeleton')).toHaveLength(0);
     expect(cells()).toHaveLength(12);
     expect(viewport().hasAttribute('aria-busy')).toBe(false);
   });
@@ -298,7 +298,7 @@ describe('mountItemsGrid', () => {
     expect(viewport().hasAttribute('role')).toBe(false);
     grid.update({ items: entities(3) });
     expect(viewport().getAttribute('role')).toBe('list');
-    expect(container.querySelector('.qf-items-grid__empty')).toBeNull();
+    expect(container.querySelector('.mf-items-grid__empty')).toBeNull();
   });
 
   it('rejects an invalid update without changing anything', () => {
@@ -441,7 +441,7 @@ describe('mountItemsGrid', () => {
 
   it('keeps the pager status blank until the grid is measured', () => {
     mount();
-    expect(container.querySelector('.qf-items-grid-pager__status')!.textContent).toBe('');
+    expect(container.querySelector('.mf-items-grid-pager__status')!.textContent).toBe('');
   });
 
   it('does not page when a card already handled the key', () => {
@@ -504,7 +504,7 @@ describe('mountItemsGrid', () => {
     grid.destroy();
     mounted = null;
     expect(container.childElementCount).toBe(0);
-    expect(container.classList.contains('qf-items-grid')).toBe(false);
+    expect(container.classList.contains('mf-items-grid')).toBe(false);
     expect(observer.disconnected).toBe(true);
   });
 });

@@ -21,7 +21,7 @@ describe('demo-angular', () => {
     flushFrames();
     await fixture.whenStable();
     expect(element.querySelectorAll('[role="listitem"]')).toHaveLength(12);
-    expect(element.querySelector('.qf-items-grid-pager__status')!.textContent!.trim()).toBe(
+    expect(element.querySelector('.mf-items-grid-pager__status')!.textContent!.trim()).toBe(
       'Items 1–12 of 120',
     );
     fixture.destroy();

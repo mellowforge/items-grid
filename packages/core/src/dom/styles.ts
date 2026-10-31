@@ -11,20 +11,20 @@ export type StyleDeclarations = Readonly<Record<string, string>>;
  * stylesheet and for app styling; layout never depends on them.
  */
 export const ITEMS_GRID_CLASSES = Object.freeze({
-  host: 'qf-items-grid',
-  viewport: 'qf-items-grid__viewport',
-  cell: 'qf-items-grid__cell',
+  host: 'mf-items-grid',
+  viewport: 'mf-items-grid__viewport',
+  cell: 'mf-items-grid__cell',
   /** Modifier added next to `cell` on skeleton slots. */
-  skeleton: 'qf-items-grid__cell--skeleton',
-  empty: 'qf-items-grid__empty',
+  skeleton: 'mf-items-grid__cell--skeleton',
+  empty: 'mf-items-grid__empty',
   /** Added next to `cell` on the hidden measuring probe. */
-  probe: 'qf-items-grid__probe',
-  live: 'qf-items-grid__live',
-  pager: 'qf-items-grid-pager',
-  pagerStatus: 'qf-items-grid-pager__status',
-  pagerList: 'qf-items-grid-pager__list',
-  pagerButton: 'qf-items-grid-pager__button',
-  pagerGap: 'qf-items-grid-pager__gap',
+  probe: 'mf-items-grid__probe',
+  live: 'mf-items-grid__live',
+  pager: 'mf-items-grid-pager',
+  pagerStatus: 'mf-items-grid-pager__status',
+  pagerList: 'mf-items-grid-pager__list',
+  pagerButton: 'mf-items-grid-pager__button',
+  pagerGap: 'mf-items-grid-pager__gap',
 });
 
 /** The host: a flex column, so the viewport takes whatever height the pager leaves. */

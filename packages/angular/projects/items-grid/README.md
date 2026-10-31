@@ -13,17 +13,17 @@ npm install @mellowforge/items-grid-angular @mellowforge/items-grid-core
 
 ```ts
 import {
-  QfItemsGrid,
-  QfItemsGridEmpty,
-  QfItemsGridItem,
-  QfItemsGridSkeleton,
+  MfItemsGrid,
+  MfItemsGridEmpty,
+  MfItemsGridItem,
+  MfItemsGridSkeleton,
 } from '@mellowforge/items-grid-angular';
 
 @Component({
   selector: 'app-devices',
-  imports: [QfItemsGrid, QfItemsGridItem, QfItemsGridSkeleton, QfItemsGridEmpty, DeviceCard],
+  imports: [MfItemsGrid, MfItemsGridItem, MfItemsGridSkeleton, MfItemsGridEmpty, DeviceCard],
   template: `
-    <qf-items-grid
+    <mf-items-grid
       class="devices-grid"
       ariaLabel="Devices"
       [items]="devices()"
@@ -31,12 +31,12 @@ import {
       preset="compact"
       [(pageIndex)]="page"
     >
-      <ng-template qfItemsGridItem [qfItemsGridItemOf]="devices()" let-device>
+      <ng-template mfItemsGridItem [mfItemsGridItemOf]="devices()" let-device>
         <app-device-card [device]="device" />
       </ng-template>
-      <ng-template qfItemsGridSkeleton><app-skeleton-card /></ng-template>
-      <ng-template qfItemsGridEmpty><app-empty-state /></ng-template>
-    </qf-items-grid>
+      <ng-template mfItemsGridSkeleton><app-skeleton-card /></ng-template>
+      <ng-template mfItemsGridEmpty><app-empty-state /></ng-template>
+    </mf-items-grid>
   `,
   // The grid needs a definite height from your layout: here the host is a full-height
   // flex column and the grid takes the space left by any toolbar.
@@ -62,9 +62,9 @@ export class Devices {
 Optional pager theme — import it once from a global stylesheet:
 `@import '@mellowforge/items-grid-core/styles.css';`
 
-`[qfItemsGridItemOf]` is only for typing: with `strictTemplates`, `let-device` is then a
+`[mfItemsGridItemOf]` is only for typing: with `strictTemplates`, `let-device` is then a
 `Device`; without it, `let-device` is `any`. A grid without an item template renders empty
-cards and logs a warning (with the binding, a missing `QfItemsGridItem` import is a compile
+cards and logs a warning (with the binding, a missing `MfItemsGridItem` import is a compile
 error instead).
 
 ## API
@@ -82,15 +82,15 @@ handler; on failure clear `loading` and the page's `items`, and retry with
 page change the grid makes, so `[(pageIndex)]` binds two-way) and `stateChange` (every new
 state — e.g. for a "5 new items" banner from `pendingCount`).
 
-**Templates:** `ng-template[qfItemsGridItem]` (context: `$implicit` / `item`, `index` =
+**Templates:** `ng-template[mfItemsGridItem]` (context: `$implicit` / `item`, `index` =
 `range.start` + the offset on the page),
-`ng-template[qfItemsGridSkeleton]` (context: `$implicit` / `slot`) and
-`ng-template[qfItemsGridEmpty]`.
+`ng-template[mfItemsGridSkeleton]` (context: `$implicit` / `slot`) and
+`ng-template[mfItemsGridEmpty]`.
 
-**Template reference:** `#grid="qfItemsGrid"` exposes `grid.state()` (a signal of the render
+**Template reference:** `#grid="mfItemsGrid"` exposes `grid.state()` (a signal of the render
 state) and `grid.controller`, an `ItemsGridHandle` (`next()`, `goTo()`, `refresh()`, …). To place a custom pager,
 set `[pager]="false"` and render
-`<qf-items-grid-pager [controller]="grid.controller" [state]="grid.state()" />` anywhere.
+`<mf-items-grid-pager [controller]="grid.controller" [state]="grid.state()" />` anywhere.
 
 ## License
 

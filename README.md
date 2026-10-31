@@ -19,7 +19,7 @@ It moves the code every dashboard keeps re-implementing into one place:
 | ----------------------------------------------------------------------------------- | ------------------------------------------ |
 | [`@mellowforge/items-grid-core`](packages/core/README.md)                           | Headless engine + vanilla `mountItemsGrid` |
 | [`@mellowforge/items-grid-react`](packages/react/README.md)                         | `<ItemsGrid>`, `useItemsGrid`              |
-| [`@mellowforge/items-grid-angular`](packages/angular/projects/items-grid/README.md) | `<qf-items-grid>` with template directives |
+| [`@mellowforge/items-grid-angular`](packages/angular/projects/items-grid/README.md) | `<mf-items-grid>` with template directives |
 
 ## How it fits
 

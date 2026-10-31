@@ -2,69 +2,69 @@
  * @mellowforge/items-grid-core/styles.css — optional pager theme.
  *
  * Layout never depends on this file: the grid applies its track layout inline. Import it
- * for a minimal pager look, or skip it and style the `qf-items-grid*` class hooks yourself.
+ * for a minimal pager look, or skip it and style the `mf-items-grid*` class hooks yourself.
  *
- * Theme with the --qf-items-grid-* custom properties, set anywhere up the tree (e.g. on
+ * Theme with the --mf-items-grid-* custom properties, set anywhere up the tree (e.g. on
  * :root). Every value has a fallback here, so the pager also works outside the grid.
  */
 
-.qf-items-grid-pager {
+.mf-items-grid-pager {
   display: flex;
   flex: none;
   align-items: center;
   justify-content: space-between;
-  gap: var(--qf-items-grid-pager-gap, 6px);
-  margin-top: var(--qf-items-grid-pager-margin, 16px);
-  font: var(--qf-items-grid-pager-font, inherit);
-  color: var(--qf-items-grid-pager-color, inherit);
+  gap: var(--mf-items-grid-pager-gap, 6px);
+  margin-top: var(--mf-items-grid-pager-margin, 16px);
+  font: var(--mf-items-grid-pager-font, inherit);
+  color: var(--mf-items-grid-pager-color, inherit);
 }
 
-.qf-items-grid-pager__status {
-  color: var(--qf-items-grid-pager-muted, color-mix(in srgb, currentColor 60%, transparent));
+.mf-items-grid-pager__status {
+  color: var(--mf-items-grid-pager-muted, color-mix(in srgb, currentColor 60%, transparent));
   font-size: 0.8125rem;
 }
 
-.qf-items-grid-pager__list {
+.mf-items-grid-pager__list {
   display: flex;
   align-items: center;
-  gap: var(--qf-items-grid-pager-gap, 6px);
+  gap: var(--mf-items-grid-pager-gap, 6px);
 }
 
-.qf-items-grid-pager__button {
-  min-width: var(--qf-items-grid-pager-button-size, 32px);
-  height: var(--qf-items-grid-pager-button-size, 32px);
+.mf-items-grid-pager__button {
+  min-width: var(--mf-items-grid-pager-button-size, 32px);
+  height: var(--mf-items-grid-pager-button-size, 32px);
   padding: 0 10px;
   border: 1px solid
-    var(--qf-items-grid-pager-border, color-mix(in srgb, currentColor 18%, transparent));
-  border-radius: var(--qf-items-grid-pager-radius, 6px);
-  background: var(--qf-items-grid-pager-background, transparent);
+    var(--mf-items-grid-pager-border, color-mix(in srgb, currentColor 18%, transparent));
+  border-radius: var(--mf-items-grid-pager-radius, 6px);
+  background: var(--mf-items-grid-pager-background, transparent);
   color: inherit;
   font: inherit;
   font-size: 0.8125rem;
   cursor: pointer;
 }
 
-.qf-items-grid-pager__button[aria-current='page'] {
-  border-color: var(--qf-items-grid-pager-current-color, #4f46e5);
+.mf-items-grid-pager__button[aria-current='page'] {
+  border-color: var(--mf-items-grid-pager-current-color, #4f46e5);
   background: var(
-    --qf-items-grid-pager-current-background,
+    --mf-items-grid-pager-current-background,
     color-mix(in srgb, #4f46e5 10%, transparent)
   );
-  color: var(--qf-items-grid-pager-current-color, #4f46e5);
+  color: var(--mf-items-grid-pager-current-color, #4f46e5);
   font-weight: 600;
 }
 
-.qf-items-grid-pager__button:disabled {
+.mf-items-grid-pager__button:disabled {
   cursor: default;
   opacity: 0.4;
 }
 
-.qf-items-grid-pager__button:focus-visible {
-  outline: 2px solid var(--qf-items-grid-focus-ring, #4f46e5);
+.mf-items-grid-pager__button:focus-visible {
+  outline: 2px solid var(--mf-items-grid-focus-ring, #4f46e5);
   outline-offset: 2px;
 }
 
-.qf-items-grid-pager__gap {
-  color: var(--qf-items-grid-pager-muted, color-mix(in srgb, currentColor 60%, transparent));
+.mf-items-grid-pager__gap {
+  color: var(--mf-items-grid-pager-muted, color-mix(in srgb, currentColor 60%, transparent));
   padding: 0 2px;
 }

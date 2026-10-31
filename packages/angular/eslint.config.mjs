@@ -17,13 +17,13 @@ export default defineConfig(
     rules: {
       '@angular-eslint/component-selector': [
         'error',
-        { type: 'element', prefix: 'qf', style: 'kebab-case' },
+        { type: 'element', prefix: 'mf', style: 'kebab-case' },
       ],
       '@angular-eslint/directive-selector': [
         'error',
-        { type: 'attribute', prefix: 'qf', style: 'camelCase' },
+        { type: 'attribute', prefix: 'mf', style: 'camelCase' },
       ],
-      // The library exports `QfItemsGrid`, not `QfItemsGridComponent` (same as treekit).
+      // The library exports `MfItemsGrid`, not `MfItemsGridComponent` (same as treekit).
       '@angular-eslint/component-class-suffix': 'off',
       '@angular-eslint/directive-class-suffix': 'off',
       // `ngTemplateContextGuard` must declare parameters it never reads.
