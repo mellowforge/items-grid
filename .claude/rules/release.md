@@ -1,6 +1,6 @@
 # Release
 
-Three packages are published to npm by **Changesets** from `.github/workflows/release.yml`: `@mellowforge/items-grid-core`, `@mellowforge/items-grid-react` and `@mellowforge/items-grid-angular`. The code lives at `github.com/Constantine-24/items-grid`, and the npm scope is `@mellowforge`. Pushing to `main` opens or updates a "Version Packages" PR that bumps versions and writes each package's `CHANGELOG.md`; merging that PR publishes. Auth is **npm trusted publishing (OIDC)** with provenance, so no npm token is stored in the repository. The root `package.json` and every app are private and never published.
+Three packages are published to npm by **Changesets** from `.github/workflows/release.yml`: `@mellowforge/items-grid-core`, `@mellowforge/items-grid-react` and `@mellowforge/items-grid-angular`. The code lives at `github.com/mellowforge/items-grid`, and the npm scope is `@mellowforge`. Pushing to `main` opens or updates a "Version Packages" PR that bumps versions and writes each package's `CHANGELOG.md`; merging that PR publishes. Auth is **npm trusted publishing (OIDC)** with provenance, so no npm token is stored in the repository. The root `package.json` and every app are private and never published.
 
 ## Changesets
 
@@ -36,7 +36,7 @@ npm trusted publishers are configured per **existing** package, so the first ver
 1. **Create the npm org.** The `@mellowforge` scope must exist on npm, and the maintainer must be allowed to publish to it.
 2. **Publish the first version by hand.** Do this locally, on an up-to-date `main` after the Version Packages PR has merged. Run `npm login`, then `pnpm build && pnpm changeset publish`. The maintainer runs this; agents never do.
 3. **Add the trusted publisher.** On npmjs.com, open each package's Settings → Trusted Publisher and set:
-   - GitHub owner `Constantine-24`
+   - GitHub owner `mellowforge`
    - repository `items-grid`
    - workflow `release.yml`
    - no environment
