@@ -25,7 +25,7 @@ Three packages are published to npm by **Changesets** from `.github/workflows/re
   - `@mellowforge/items-grid-angular`: `fesm2022/` and `types/` (with `.d.ts`); there is no `dist/` inside this tarball.
 - **Each package directory carries a `LICENSE`** that is a byte-identical copy of the root `LICENSE`, because npm only packs files from inside the package. For Angular, ng-packagr copies `packages/angular/projects/items-grid/LICENSE` into `dist/items-grid`. `pnpm pack:check` compares each tarball's LICENSE with the root one.
 - **The Angular package is published from `packages/angular/dist/items-grid`** (`publishConfig.directory`). pnpm rewrites the `workspace:` ranges there at pack time. `pnpm pack:check` proves it and also runs arethetypeswrong on every tarball.
-- **The Version Packages PR shows no CI checks.** It is opened with `GITHUB_TOKEN`, and GitHub does not trigger other workflows from that token's pushes. To compensate, `pnpm release` re-runs every gate before publishing. To get real checks on the PR, give `changesets/action` a fine-grained PAT instead.
+- **The Version Packages PR shows no CI checks.** It is opened with `GITHUB_TOKEN`, and GitHub does not trigger other workflows from that token's pushes. To compensate, `pnpm release` re-runs every gate before publishing. To get real checks on the PR, pass a fine-grained PAT to `changesets/action`'s `github-token` input (v2 ignores a `GITHUB_TOKEN` env var).
 - **The release job runs only in `mellowforge/items-grid`**, so forks never open Version PRs or try to publish.
 
 ## First publish and trusted publishing (maintainer)
