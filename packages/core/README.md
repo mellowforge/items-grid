@@ -65,9 +65,13 @@ in place (for `mountItemsGrid().update()` too). Checked: `getKey`, `items` (an a
 `mode`, `reflow`, `align`, `total`, `pageIndex` (a number ≥ 0; fractions are floored),
 `maxColumns`, `maxPageSize`, `requestDebounceMs`, `messages` and the preset values. In the
 adapters the error surfaces where they push options: an error boundary in React, Angular's
-`ErrorHandler`. The same holds when app code throws while the grid updates (e.g. a throwing
-`getKey` or `messages.page`): `setOptions`, `goTo`, `refresh()`, `setViewportSize` and
-`setMeasuredRowHeight` apply completely or not at all.
+`ErrorHandler`. The same holds when app code throws while the grid works out the new page
+(a throwing `getKey` or `messages.page`): `setOptions`, `goTo` and `refresh()` change nothing,
+and a viewport or row-height report keeps the page where it was but remembers the measured
+size, so the next successful update lays out for it. Errors from `onPageRequest`,
+`onPageChange`, `onStateChange` and subscribers are rethrown after the update has applied.
+Size reports run in animation frames, so their errors are uncaught (they reach
+`window.onerror`, not an error boundary or `ErrorHandler`).
 
 | Option              | Default    | Description                                                                                                                                                                         |
 | ------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -114,8 +118,9 @@ then pass the page as `items` and the dataset size as `total` (or leave `total` 
 Guard against out-of-order responses. On a failed fetch, clear `loading` and the page's
 `items` (so the previous page never shows under the new page's numbers), and retry with
 `refresh()` — navigating to the same page again does not re-request it. If `onPageRequest`
-itself throws, the grid does not re-send that request on its own (even when the callback had
-already set `loading`); navigating to the page or `refresh()` retries it. With a known total,
+itself throws, the update it failed in does not re-send it (even when the callback had already
+set `loading`); the app's next update — new options, a resize, navigation or `refresh()` —
+asks for the page again. With a known total,
 `range` follows `total`, not the length of `items`; while the total is unknown, emptiness is
 only reported once you pass `total: 0`.
 

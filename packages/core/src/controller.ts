@@ -140,7 +140,11 @@ export interface ItemsGridOptions<T> {
    * request immediately. Default `150`.
    */
   readonly requestDebounceMs?: number;
-  /** Server mode: called when the grid needs a page the app has not supplied yet. */
+  /**
+   * Server mode: called when the grid needs a page the app has not supplied yet. If it
+   * throws, the grid does not re-send that page from the same update; the app's next update
+   * (options, a resize, navigation or `refresh()`) asks for it again.
+   */
   readonly onPageRequest?: (request: PageRequest) => void;
   /**
    * Called whenever the page index changes: navigation, reanchoring after a resize or
@@ -376,7 +380,10 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   /** Server stable mode: the known total when the page was frozen. */
   private _baselineTotal: number | null = null;
   private _lastRequest: PageRequest | null = null;
-  /** The request whose `onPageRequest` threw: not re-sent until the app asks again. */
+  /**
+   * The request whose `onPageRequest` threw. The effects of that same update do not re-send
+   * it; the next update the app starts (outermost `_apply`) forgets it.
+   */
   private _failedRequest: PageRequest | null = null;
   private _requestTimer: ReturnType<typeof setTimeout> | null = null;
   private _announcement = '';
@@ -455,13 +462,19 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
 
   /**
    * Applies an input change and syncs. If deriving the new state throws (app code such as
-   * `getKey` or `messages` runs during it), every input and piece of paging bookkeeping is
-   * put back, so no half-applied input survives into the next sync.
+   * `getKey` or `messages` runs during it), the options and the paging bookkeeping are put
+   * back, so no half-applied input survives into the next sync. Measurements (viewport size,
+   * row height) are kept: observers never report an unchanged size again, so the next
+   * successful sync must lay out for the size the element really has.
    */
   private _apply(change: () => { cause: SyncCause; navigated?: boolean }): readonly Caught[] {
     const restore = this._checkpoint();
-    const { cause, navigated = false } = change();
     try {
+      if (this._depth === 0) {
+        // A new update from the app: a page whose onPageRequest threw may be asked for again.
+        this._failedRequest = null;
+      }
+      const { cause, navigated = false } = change();
       return this._sync(cause, navigated);
     } catch (error) {
       restore();
@@ -469,11 +482,12 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     }
   }
 
-  /** Captures the inputs and paging bookkeeping; the returned function puts them back. */
+  /**
+   * Captures the options and paging bookkeeping (not the measurements); the returned
+   * function puts them back.
+   */
   private _checkpoint(): () => void {
     const options = this._options;
-    const viewport = this._viewport;
-    const measuredRowHeight = this._measuredRowHeight;
     const snapshot = this._snapshot;
     const baselineTotal = this._baselineTotal;
     const lastRequest = this._lastRequest;
@@ -482,8 +496,6 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     const anchorIndex = this._anchorIndex;
     return () => {
       this._options = options;
-      this._viewport = viewport;
-      this._measuredRowHeight = measuredRowHeight;
       this._snapshot = snapshot;
       this._baselineTotal = baselineTotal;
       this._lastRequest = lastRequest;
@@ -505,8 +517,9 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
   }
 
   /**
-   * Reports the viewport's content-box size. Adapters wire this to a ResizeObserver.
-   * If app code throws during the update, the previous size stays in place.
+   * Reports the viewport's content-box size. Adapters wire this to a ResizeObserver. If app
+   * code throws during the update, the page stays where it was; the size is kept, so the next
+   * successful update lays out for it.
    */
   setViewportSize(size: ViewportSize): void {
     rethrow(
@@ -519,7 +532,8 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
 
   /**
    * Reports the measured card height, or `null` to fall back to the preset's. If app code
-   * throws during the update, the previous height stays in place.
+   * throws during the update, the page stays where it was; the height is kept, so the next
+   * successful update lays out for it.
    */
   setMeasuredRowHeight(height: number | null): void {
     const next = height !== null && Number.isFinite(height) && height > 0 ? height : null;
@@ -987,7 +1001,11 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
         this._debouncedRequest();
       } catch (error) {
         // Nobody can catch a timer's error: report it with context instead.
-        console.error('items-grid: a debounced page request failed.', error);
+        console.error(
+          "items-grid: a debounced page request failed; the app's next update or refresh() " +
+            'asks for the page again.',
+          error
+        );
       }
     }, this._options.requestDebounceMs ?? DEFAULT_DEBOUNCE_MS);
   }
@@ -1012,10 +1030,13 @@ export class ItemsGridController<T> implements ItemsGridHandle<T> {
     try {
       this._options.onPageRequest?.(request);
     } catch (error) {
-      // Not sent after all: navigating to the page or refresh() must retry it, but the grid
-      // does not re-send it on its own (e.g. when the failing callback also set `loading`).
-      if (this._lastRequest === request) this._lastRequest = previous;
-      this._failedRequest = request;
+      // Not sent after all: the app's next update must be able to ask for it again, but this
+      // update's effects don't re-send it (e.g. when the failing callback also set `loading`).
+      // Nothing is recorded if the callback destroyed the grid or sent another request.
+      if (this._lastRequest === request) {
+        this._lastRequest = previous;
+        this._failedRequest = request;
+      }
       throw error;
     }
     this._failedRequest = null;

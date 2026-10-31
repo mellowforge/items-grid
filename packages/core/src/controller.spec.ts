@@ -1242,7 +1242,9 @@ describe('ItemsGridController — all-or-nothing inputs', () => {
     expect(controller.getState().pageIndex).toBe(0);
   });
 
-  it('keeps the viewport when setViewportSize throws', () => {
+  // Observers never report an unchanged size again, so a measurement must survive a failed
+  // update: the next successful one lays out for the size the element really has.
+  it('lays out for the reported viewport once an update after a failed resize succeeds', () => {
     const { controller, fail } = failing();
     controller.goTo(2);
     fail.page = true;
@@ -1250,23 +1252,28 @@ describe('ItemsGridController — all-or-nothing inputs', () => {
     fail.page = false;
     expect(controller.getState().pageSize).toBe(12);
     controller.setOptions({ align: 'center' });
-    expect(controller.getState()).toMatchObject({ pageSize: 12, pageIndex: 2 });
-    // The same size reported again applies.
-    controller.setViewportSize(NARROW);
-    expect(controller.getState().pageSize).toBe(9);
+    // 9 per page, reanchored on the first card of page 2 (index 24).
+    expect(controller.getState()).toMatchObject({ pageSize: 9, pageIndex: 2 });
   });
 
-  it('keeps the row height when setMeasuredRowHeight throws', () => {
+  it('lays out for the measured row height once an update after a failed report succeeds', () => {
     const { controller, fail } = failing({ measureRowHeight: true });
     controller.goTo(1);
     fail.page = true;
     expect(() => controller.setMeasuredRowHeight(300)).toThrow('bad message');
     fail.page = false;
     controller.setOptions({ align: 'center' });
-    expect(controller.getState().geometry).toMatchObject({ rowHeight: 160, rows: 3 });
-    // The same height reported again applies.
-    controller.setMeasuredRowHeight(300);
     expect(controller.getState().geometry).toMatchObject({ rowHeight: 300, rows: 1 });
+  });
+
+  it('lays out once the app recovers from a failed first layout', () => {
+    const { controller, fail } = failing();
+    controller.setViewportSize({ width: 0, height: 0 }); // hidden
+    fail.key = true;
+    expect(() => controller.setViewportSize(WIDE)).toThrow('bad key');
+    fail.key = false;
+    controller.setOptions({ items: entities(60) });
+    expect(controller.getState().items).toHaveLength(12);
   });
 
   it('keeps the stable server baseline when refresh throws', () => {
@@ -1291,7 +1298,7 @@ describe('ItemsGridController — a throwing onPageRequest', () => {
     vi.useFakeTimers();
   });
 
-  it('is not re-sent unless the app asks again', () => {
+  it('is not re-sent by the update it failed in, only by the next one', () => {
     const requests: number[] = [];
     let fail = false;
     const controller: ItemsGridController<Entity> = setup({
@@ -1311,12 +1318,59 @@ describe('ItemsGridController — a throwing onPageRequest', () => {
     expect(() => controller.goTo(2)).toThrow('offline');
     fail = false;
     vi.advanceTimersByTime(1000);
-    controller.setOptions({ loading: false });
-    vi.advanceTimersByTime(1000);
+    // The loading it set in the failing call owed a request; that is not re-sent.
     expect(requests.filter(page => page === 2)).toHaveLength(1);
 
-    controller.refresh();
+    // The app's next update asks for the page again.
+    controller.setOptions({ loading: false });
+    vi.advanceTimersByTime(1000);
     expect(requests.filter(page => page === 2)).toHaveLength(2);
+  });
+
+  it('asks again on the next update after a failed first layout', () => {
+    const requests: number[] = [];
+    let fail = true;
+    const controller = new ItemsGridController<Entity>({
+      getKey: item => item.id,
+      mode: 'server',
+      onPageRequest: request => {
+        requests.push(request.pageIndex);
+        if (fail) throw new Error('not ready');
+      },
+    });
+    created.push(controller);
+    expect(() => controller.setViewportSize(WIDE)).toThrow('not ready');
+    fail = false;
+    controller.setOptions({ align: 'center' });
+    vi.advanceTimersByTime(1000);
+    expect(requests).toEqual([0, 0]);
+  });
+
+  it('records no failure when the callback destroyed the grid', () => {
+    const requests: number[] = [];
+    let fail = false;
+    const controller: ItemsGridController<Entity> = setup({
+      mode: 'server',
+      items: entities(12),
+      total: 120,
+      onPageRequest: request => {
+        requests.push(request.pageIndex);
+        if (fail) {
+          fail = false;
+          controller.destroy();
+          throw new Error('offline');
+        }
+      },
+    });
+    fail = true;
+    expect(() => controller.goTo(2)).toThrow('offline');
+    // Re-subscribed (e.g. a StrictMode remount): the next layout requests its page again.
+    controller.subscribe(() => {});
+    vi.advanceTimersByTime(1000);
+    expect(requests.filter(page => page === 2)).toHaveLength(1);
+    controller.setViewportSize(NARROW);
+    vi.advanceTimersByTime(1000);
+    expect(requests.at(-1)).toBe(2);
   });
 
   it('forgets the failure once a later request goes through', () => {
