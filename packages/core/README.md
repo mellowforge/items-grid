@@ -58,6 +58,10 @@ grid.destroy();
 > that box. Put toolbars and banners _outside_ it; the built-in pager sits inside the host
 > but outside the measured viewport, so it never needs a hard-coded offset.
 
+For your own pager, mount with `pager: false` and render it next to the container from
+`grid.controller.getState()`, re-rendering in `grid.controller.subscribe(…)` (keep the
+container's height independent of it, as above).
+
 ## Options (`ItemsGridOptions<T>`)
 
 Invalid values throw an `items-grid:` error naming the field, and the previous options stay

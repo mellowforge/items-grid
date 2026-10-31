@@ -38,7 +38,12 @@ import {
 } from '@mellowforge/items-grid-core';
 
 import { MfItemsGridPager } from './items-grid-pager';
-import { MfItemsGridEmpty, MfItemsGridItem, MfItemsGridSkeleton } from './items-grid-templates';
+import {
+  MfItemsGridEmpty,
+  MfItemsGridItem,
+  MfItemsGridPagerTemplate,
+  MfItemsGridSkeleton,
+} from './items-grid-templates';
 
 /**
  * A card grid that fits its host exactly: the page holds as many full rows and columns as
@@ -115,11 +120,18 @@ import { MfItemsGridEmpty, MfItemsGridItem, MfItemsGridSkeleton } from './items-
       }
     </div>
     @if (pager()) {
-      <mf-items-grid-pager
-        [controller]="controller"
-        [state]="state()"
-        [labels]="pagerLabels() ?? undefined"
-      />
+      @if (pagerDef(); as custom) {
+        <ng-container
+          [ngTemplateOutlet]="custom.template"
+          [ngTemplateOutletContext]="{ $implicit: state(), state: state(), controller }"
+        />
+      } @else {
+        <mf-items-grid-pager
+          [controller]="controller"
+          [state]="state()"
+          [labels]="pagerLabels() ?? undefined"
+        />
+      }
     }
     <div class="mf-items-grid__live" [style]="liveStyle" aria-live="polite">
       {{ state().announcement }}
@@ -186,7 +198,10 @@ export class MfItemsGrid<T> {
   /** Screen-reader announcements, merged over the English defaults. */
   readonly messages = input<Partial<ItemsGridMessages> | undefined>(undefined);
 
-  /** Render the built-in pager below the grid. Default `true`. */
+  /**
+   * Render a pager below the grid: the built-in one, or the projected
+   * `ng-template[mfItemsGridPagerTemplate]`. Default `true`.
+   */
   readonly pager = input(true);
 
   /** Texts of the built-in pager. */
@@ -214,6 +229,7 @@ export class MfItemsGrid<T> {
   protected readonly itemDef = contentChild(MfItemsGridItem<T>);
   protected readonly skeletonDef = contentChild(MfItemsGridSkeleton);
   protected readonly emptyDef = contentChild(MfItemsGridEmpty);
+  protected readonly pagerDef = contentChild(MfItemsGridPagerTemplate);
 
   private readonly _viewport = viewChild.required<ElementRef<HTMLElement>>('viewport');
   private readonly _probe = viewChild<ElementRef<HTMLElement>>('probe');

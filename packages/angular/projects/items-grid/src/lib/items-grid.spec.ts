@@ -5,7 +5,12 @@ import type { PageRequest, PagingMode } from '@mellowforge/items-grid-core';
 import { flushFrames, installLayoutStubs, ResizeObserverStub } from '../test-utils/resize-observer';
 import { MfItemsGrid } from './items-grid';
 import { MfItemsGridPager } from './items-grid-pager';
-import { MfItemsGridEmpty, MfItemsGridItem, MfItemsGridSkeleton } from './items-grid-templates';
+import {
+  MfItemsGridEmpty,
+  MfItemsGridItem,
+  MfItemsGridPagerTemplate,
+  MfItemsGridSkeleton,
+} from './items-grid-templates';
 
 interface Entity {
   id: number;
@@ -429,7 +434,51 @@ class CustomPagerHostComponent {
   readonly getKey = (item: Entity): number => item.id;
 }
 
+@Component({
+  imports: [MfItemsGrid, MfItemsGridItem, MfItemsGridPagerTemplate],
+  template: `
+    <mf-items-grid [items]="items" [getKey]="getKey" [pager]="pager()">
+      <ng-template mfItemsGridItem let-item>{{ item.name }}</ng-template>
+      <ng-template mfItemsGridPagerTemplate let-state let-grid="controller">
+        <button type="button" class="custom" (click)="grid.next()">
+          custom {{ state.pageIndex + 1 }} of {{ state.pageCount }}
+        </button>
+      </ng-template>
+    </mf-items-grid>
+  `,
+})
+class PagerTemplateHostComponent {
+  readonly items = entities(30);
+  readonly pager = signal(true);
+  readonly getKey = (item: Entity): number => item.id;
+}
+
 describe('MfItemsGrid — composition', () => {
+  it('renders a projected pager template in place of the built-in pager, and none when pager is false', async () => {
+    const custom = TestBed.createComponent(PagerTemplateHostComponent);
+    await custom.whenStable();
+    const root: HTMLElement = custom.nativeElement;
+    ResizeObserverStub.for(root.querySelector('.mf-items-grid__viewport')!).fire(1318, 552);
+    flushFrames();
+    await custom.whenStable();
+    const customButton = (): HTMLButtonElement | null => root.querySelector('button.custom');
+    expect(root.querySelector('mf-items-grid-pager')).toBeNull();
+    expect(customButton()!.textContent!.trim()).toBe('custom 1 of 3');
+    // The template sits between the viewport and the live region, like the built-in pager.
+    const host = root.querySelector('mf-items-grid')!;
+    expect(
+      customButton()!.compareDocumentPosition(host.querySelector('.mf-items-grid__viewport')!),
+    ).toBe(Node.DOCUMENT_POSITION_PRECEDING);
+    customButton()!.click();
+    await custom.whenStable();
+    expect(customButton()!.textContent!.trim()).toBe('custom 2 of 3');
+    expect(root.querySelector('[role="listitem"]')!.textContent!.trim()).toBe('Entity 12');
+    custom.componentInstance.pager.set(false);
+    await custom.whenStable();
+    expect(customButton()).toBeNull();
+    custom.destroy();
+  });
+
   it('warns when no item template is projected', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const missing = TestBed.createComponent(MissingTemplateHostComponent);

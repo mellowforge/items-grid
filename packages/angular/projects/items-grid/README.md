@@ -85,12 +85,20 @@ state — e.g. for a "5 new items" banner from `pendingCount`).
 
 **Templates:** `ng-template[mfItemsGridItem]` (context: `$implicit` / `item`, `index` =
 `range.start` + the offset on the page),
-`ng-template[mfItemsGridSkeleton]` (context: `$implicit` / `slot`) and
-`ng-template[mfItemsGridEmpty]`.
+`ng-template[mfItemsGridSkeleton]` (context: `$implicit` / `slot`),
+`ng-template[mfItemsGridEmpty]` and `ng-template[mfItemsGridPagerTemplate]` (context:
+`$implicit` / `state`, `controller`) — a custom pager rendered in place of the built-in one,
+below the cards and outside the measured viewport; `[pager]="false"` hides it too:
+
+```html
+<ng-template mfItemsGridPagerTemplate let-state let-grid="controller">
+  <button type="button" [disabled]="!state.canNext" (click)="grid.next()">More</button>
+</ng-template>
+```
 
 **Template reference:** `#grid="mfItemsGrid"` exposes `grid.state()` (a signal of the render
-state) and `grid.controller`, an `ItemsGridHandle` (`next()`, `goTo()`, `refresh()`, …). To place a custom pager,
-set `[pager]="false"` and render
+state) and `grid.controller`, an `ItemsGridHandle` (`next()`, `goTo()`, `refresh()`, …). To place a pager elsewhere on the page, set
+`[pager]="false"` and render
 `<mf-items-grid-pager [controller]="grid.controller" [state]="grid.state()" />` anywhere.
 
 ## License
