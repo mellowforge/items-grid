@@ -43,6 +43,6 @@ apps/demo-react, apps/demo-angular  source-linked mirrors of each other
 - TDD: write the failing spec, watch it fail for the right reason, then implement. A new adapter scenario goes into **both** adapter specs.
 - User-visible package changes need a changeset (packages are versioned together) and README updates.
 - Run the review gate in `.claude/rules/review-gate.md` per chunk. Deferred work goes to `BACKLOG.md`.
-- Never publish to npm or push tags; never commit to `main` directly.
+- Never publish to npm or push tags (`.claude/hooks/block-raw-tooling.js` blocks the publish commands, npm/yarn installs and bare `vitest` in the Angular workspace); never commit to `main` directly. Releases: `.claude/rules/release.md`.
 
 @.claude/rules/review-gate.md

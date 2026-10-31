@@ -1,0 +1,54 @@
+name: Release
+
+# Changesets release flow for @quietfoundry/items-grid-core, @quietfoundry/items-grid-react and
+# @quietfoundry/items-grid-angular.
+#
+# On every push to main: if changesets are pending, open or update the "Version Packages" PR
+# (versions + CHANGELOGs). When that PR is merged, the same job publishes every package whose
+# version is not on npm yet, then tags the release.
+#
+# Auth: npm trusted publishing (OIDC) — no npm token is stored anywhere. Each package's trusted
+# publisher on npmjs.com (package → Settings → Trusted Publisher) must name GitHub owner
+# "Constantine-24", repository "items-grid", workflow file "release.yml", no environment, and allow
+# direct publishing. changesets/action skips writing an .npmrc when OIDC is available, and pnpm
+# performs the OIDC exchange itself. Trusted publishers can only be added to packages that already
+# exist, so the very first version of each package is published by hand — see
+# .claude/rules/release.md.
+
+on:
+  push:
+    branches: [main]
+
+concurrency: release-${{ github.ref }}
+
+permissions:
+  contents: write # push the version commit and tags
+  pull-requests: write # open the Version Packages PR
+  id-token: write # npm trusted publishing + provenance
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # pnpm version comes from "packageManager" in package.json.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false # npm's guidance: never cache dependencies in release builds
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Version Packages PR, or publish
+        uses: changesets/action@v1
+        with:
+          version: pnpm version-packages
+          publish: pnpm release
+          commit: 'chore(release): version packages'
+          title: 'chore(release): version packages'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'

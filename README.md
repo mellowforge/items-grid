@@ -51,13 +51,15 @@ same 120 sample entities from the Figma prototypes.
 ```sh
 pnpm build       # core → react → angular → apps
 pnpm test        # Vitest everywhere (Angular through ng test)
-pnpm lint
+pnpm lint        # ESLint (Angular through angular-eslint, inline templates included)
 pnpm typecheck
 pnpm pack:check  # pack each package and verify its tarball and type resolution
 ```
 
 Releases use [Changesets](https://github.com/changesets/changesets); the three packages are
-versioned together.
+versioned together. Merging the "Version Packages" PR publishes them from
+`.github/workflows/release.yml` through npm trusted publishing — see
+[`.claude/rules/release.md`](.claude/rules/release.md) for the first-publish steps.
 
 ## License
 

@@ -4,14 +4,14 @@
   "description": "Headless engine for card grids that fit the screen: exact page size from the viewport, fixed or measured row height, size presets, client or server paging, live or stable realtime reflow. Zero dependencies.",
   "license": "MIT",
   "author": "Konstantin Penzin",
-  "homepage": "https://github.com/quietfoundry/items-grid#readme",
+  "homepage": "https://github.com/Constantine-24/items-grid#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/quietfoundry/items-grid.git",
+    "url": "git+https://github.com/Constantine-24/items-grid.git",
     "directory": "packages/core"
   },
   "bugs": {
-    "url": "https://github.com/quietfoundry/items-grid/issues"
+    "url": "https://github.com/Constantine-24/items-grid/issues"
   },
   "keywords": [
     "grid",

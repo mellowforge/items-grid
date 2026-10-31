@@ -57,6 +57,8 @@ import { QfItemsGridEmpty, QfItemsGridItem, QfItemsGridSkeleton } from './items-
   imports: [NgTemplateOutlet, QfItemsGridPager],
   host: { class: 'qf-items-grid', '[style]': 'hostStyle' },
   template: `
+    <!-- PageUp/PageDown bubble up from focused cards; the list itself is not a tab stop. -->
+    <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -->
     <div
       #viewport
       class="qf-items-grid__viewport"

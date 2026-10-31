@@ -40,8 +40,8 @@ export class QfItemsGridItem<T> {
 
   static ngTemplateContextGuard<T>(
     _directive: QfItemsGridItem<T>,
-    context: unknown,
-  ): context is QfItemsGridItemContext<T> {
+    _context: unknown,
+  ): _context is QfItemsGridItemContext<T> {
     return true;
   }
 }
@@ -55,8 +55,8 @@ export class QfItemsGridSkeleton {
 
   static ngTemplateContextGuard(
     _directive: QfItemsGridSkeleton,
-    context: unknown,
-  ): context is QfItemsGridSkeletonContext {
+    _context: unknown,
+  ): _context is QfItemsGridSkeletonContext {
     return true;
   }
 }

@@ -4,14 +4,14 @@
   "description": "Angular component over @quietfoundry/items-grid-core: a card grid that fits the screen exactly, with size presets, fixed or measured row height, client or server paging, live or stable realtime reflow, skeletons and an optional pager. Signals, zoneless-ready, no Material or CDK dependency.",
   "license": "MIT",
   "author": "Konstantin Penzin",
-  "homepage": "https://github.com/quietfoundry/items-grid#readme",
+  "homepage": "https://github.com/Constantine-24/items-grid#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/quietfoundry/items-grid.git",
+    "url": "git+https://github.com/Constantine-24/items-grid.git",
     "directory": "packages/angular/projects/items-grid"
   },
   "bugs": {
-    "url": "https://github.com/quietfoundry/items-grid/issues"
+    "url": "https://github.com/Constantine-24/items-grid/issues"
   },
   "keywords": [
     "angular",
