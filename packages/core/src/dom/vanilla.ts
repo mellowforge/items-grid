@@ -374,7 +374,7 @@ export function mountItemsGrid<T>(
     renderProbe(state);
     renderPager(state);
     if (options.arrowKeys && !detachNavigation) {
-      detachNavigation = attachCardNavigation(viewport, controller);
+      detachNavigation = attachCardNavigation(viewport, controller).detach;
     } else if (!options.arrowKeys && detachNavigation) {
       detachNavigation();
       detachNavigation = null;

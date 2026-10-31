@@ -568,10 +568,10 @@ describe('MfItemsGrid — arrowKeys', () => {
     host.arrowKeys.set(true);
     await layout();
     await settle();
-    cells()[5]!.focus();
+    cells()[9]!.focus();
     press('PageDown');
     await settle();
-    expect(focused()).toBe('Entity 17');
+    expect(focused()).toBe('Entity 21');
     // The last page has 6 cards: focus clamps to the last one.
     press('PageDown');
     await settle();
@@ -601,5 +601,37 @@ describe('MfItemsGrid — arrowKeys', () => {
     host.arrowKeys.set(false);
     await settle();
     expect(cells().some((cell) => cell.hasAttribute('tabindex'))).toBe(false);
+    // Detached for good: new cards get no tab stops either.
+    await click(button('Next page'));
+    await settle();
+    expect(cells().some((cell) => cell.hasAttribute('tabindex'))).toBe(false);
+  });
+
+  it('leaves Escape to a card control that handles it, and returns to the card otherwise', async () => {
+    host.arrowKeys.set(true);
+    host.handled.set(true);
+    host.withInput.set(true);
+    await layout();
+    await settle();
+    const eater = cells()[3]!.querySelector<HTMLButtonElement>('.eats-keys')!;
+    eater.focus();
+    press('Escape');
+    expect(document.activeElement).toBe(eater);
+    const note = cells()[3]!.querySelector('input')!;
+    note.focus();
+    press('Escape');
+    expect(document.activeElement).toBe(cells()[3]);
+  });
+
+  it('keeps focus on a card that moves', async () => {
+    host.arrowKeys.set(true);
+    await layout();
+    await settle();
+    cells()[2]!.focus();
+    const items = entities(30);
+    host.items.set([items[2]!, items[0]!, items[1]!, ...items.slice(3)]);
+    await settle();
+    expect(focused()).toBe('Entity 2');
+    expect(tabStops()).toEqual(['Entity 2']);
   });
 });

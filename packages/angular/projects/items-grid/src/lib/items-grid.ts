@@ -321,7 +321,7 @@ export class MfItemsGrid<T> {
 
     effect((onCleanup) => {
       if (this.arrowKeys()) {
-        onCleanup(attachCardNavigation(this._viewport().nativeElement, this._controller));
+        onCleanup(attachCardNavigation(this._viewport().nativeElement, this._controller).detach);
       }
     });
 

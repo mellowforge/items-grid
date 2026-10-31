@@ -153,7 +153,8 @@ Helpers for adapters: `observeSize` (ResizeObserver, one report per animation fr
 once per page load where ResizeObserver is missing, e.g. jsdom tests), `getViewportStyle` and
 friends (the inline layout styles), `shouldPageGrid` and `isEditableTarget`,
 `ITEMS_GRID_CLASSES`, `getPagerItems`, `resolvePagerLabels`, `DEFAULT_PAGER_LABELS`,
-`attachCardNavigation` and `getCardMove` (see [Arrow keys](#arrow-keys-arrowkeys-opt-in)).
+`attachCardNavigation` (`CardNavigation`, `CardNavigationOptions`) and `getCardMove`
+(`CardGrid`, `CardMove`) — see [Arrow keys](#arrow-keys-arrowkeys-opt-in).
 
 After `destroy()`, the vanilla mount's handle ignores calls (warning once) and `update()`
 throws.
@@ -170,26 +171,31 @@ uses real buttons with labels and `aria-current="page"`.
 ### Arrow keys (`arrowKeys`, opt-in)
 
 `mountItemsGrid({ arrowKeys: true })`, `<ItemsGrid arrowKeys>` and
-`<mf-items-grid [arrowKeys]="true">` let the keyboard move between cards. One card at a time
-is a tab stop (the cells get a roving `tabindex`; your card markup is never touched), so Tab
-enters the grid once and then continues into that card's own controls. With focus on a card:
+`<mf-items-grid [arrowKeys]="true">` let the keyboard move between cards. One card cell at a
+time is a tab stop (the others get `tabindex="-1"`; your card markup is never touched), so Tab
+reaches one card and then its controls. Controls inside other cards stay in the Tab order, and
+tabbing into one makes its card the arrow start. With focus on a card cell:
 
-| Key        | Moves to                                                                                                                                                  |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ← / →      | the previous / next card in reading order (swapped in a right-to-left layout); past the last card to the next page, before the first to the previous page |
-| ↑ / ↓      | the card above / below; past the top or bottom row to the same column on the previous / next page                                                         |
-| Home / End | the first / last card on the page                                                                                                                         |
+| Key        | Moves to                                                                                                                                                                               |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ← / →      | the previous / next card in reading order (swapped in a right-to-left layout); → past the last card to the next page's first card, ← before the first to the previous page's last card |
+| ↑ / ↓      | the card above / below, or the last card when the row below is shorter; past the top / bottom row to the same column on the previous / next page (clamped to the cards that page has)  |
+| Home / End | the first / last card on the page                                                                                                                                                      |
 
-Keys pressed inside a card's own controls stay theirs; Escape there returns focus to the card.
-Reaching a control with Tab makes its card the arrow start. When the focused card leaves the
-grid — PageUp / PageDown, a resize that changes the page, a realtime update that removes it —
-focus moves to the card now at the same position (in server mode once the page's cards
-arrive); arrows that cross a page land on its first card or the same column. Focus the user
-moved elsewhere is never pulled back. The
-optional stylesheet draws a `:focus-visible` ring on focused cards (`--mf-items-grid-focus-ring`).
-For your own renderer, `attachCardNavigation(viewport, controller)` does all of this for the
-viewport's `role="listitem"` children and returns a detach function; `getCardMove` is the pure
-key-to-target rule.
+Without a previous / next page (`canPrev` / `canNext`) the key is still handled and focus stays
+put. Keys with Alt, Ctrl, Meta or Shift, keys during IME composition and keys a card control
+already handled (`preventDefault()`) are left alone; Escape in a card's control returns focus
+to the card. When the focused card leaves the grid — PageUp / PageDown, a resize that changes
+the page, a realtime update that removes it — focus moves to the card now at the same position
+(in server mode once the page's cards arrive); a card that only moves keeps focus, and focus
+the user moved elsewhere is never pulled back. The optional stylesheet draws a
+`:focus-visible` ring on focused cards (`--mf-items-grid-focus-ring`).
+
+For your own renderer, `attachCardNavigation(viewport, controller, options?)` does all of this
+for the viewport's `role="listitem"` children and returns `{ handleKeydown, detach }`. If your
+renderer runs card handlers after native viewport listeners (event delegation, like React),
+pass `{ listenToKeys: false }` and call `handleKeydown(event)` from the viewport's own key
+handler. `getCardMove` (with `CardGrid` / `CardMove`) is the pure key-to-target rule.
 
 ## Styling
 

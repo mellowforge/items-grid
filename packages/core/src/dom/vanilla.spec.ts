@@ -606,10 +606,10 @@ describe('mountItemsGrid — arrowKeys', () => {
     mount({ arrowKeys: true });
     layout();
     await settle();
-    cells()[5]!.focus();
-    press(cells()[5]!, 'PageDown');
+    cells()[9]!.focus();
+    press(cells()[9]!, 'PageDown');
     await settle();
-    expect(focused()).toBe('Entity 17');
+    expect(focused()).toBe('Entity 21');
     // The last page has 6 cards: focus clamps to the last one.
     press(document.activeElement!, 'PageDown');
     await settle();
@@ -626,8 +626,109 @@ describe('mountItemsGrid — arrowKeys', () => {
     expect(tabStops()).toEqual(['Entity 3']);
     expect(press(action, 'ArrowRight').defaultPrevented).toBe(false);
     expect(document.activeElement).toBe(action);
-    press(action, 'Escape');
+    expect(press(action, 'Escape').defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(cells()[3]!);
+  });
+
+  it('leaves Escape to a card control that handles it', async () => {
+    mount({ arrowKeys: true, renderItem: withButton });
+    layout();
+    await settle();
+    const action = button('Open Entity 3');
+    action.addEventListener('keydown', event => event.preventDefault());
+    action.focus();
+    press(action, 'Escape');
+    expect(document.activeElement).toBe(action);
+  });
+
+  it('returns to the card with Escape from a control inside a shadow root', async () => {
+    mount({
+      arrowKeys: true,
+      renderItem: item => {
+        const card = document.createElement('article');
+        card.append(item.name);
+        const widget = document.createElement('div');
+        const inner = widget
+          .attachShadow({ mode: 'open' })
+          .appendChild(document.createElement('button'));
+        inner.className = 'inner';
+        card.append(widget);
+        return card;
+      },
+    });
+    layout();
+    await settle();
+    const host = cells()[2]!.querySelector('div')!;
+    const inner = host.shadowRoot!.querySelector('button')!;
+    inner.focus();
+    inner.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        composed: true,
+        cancelable: true,
+      })
+    );
+    expect(document.activeElement).toBe(cells()[2]!);
+  });
+
+  it('leaves modified and composing keys alone', async () => {
+    mount({ arrowKeys: true });
+    layout();
+    await settle();
+    cells()[5]!.focus();
+    for (const modifier of ['altKey', 'ctrlKey', 'metaKey', 'shiftKey', 'isComposing']) {
+      const event = new KeyboardEvent('keydown', {
+        key: 'ArrowRight',
+        bubbles: true,
+        cancelable: true,
+        [modifier]: true,
+      });
+      cells()[5]!.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(focused()).toBe('Entity 5');
+    }
+  });
+
+  it('keeps focus on a card the renderer moves', async () => {
+    const grid = mount({ arrowKeys: true });
+    layout();
+    await settle();
+    cells()[2]!.focus();
+    const items = entities(30);
+    grid.update({ items: [items[2]!, items[0]!, items[1]!, ...items.slice(3)] });
+    await settle();
+    expect(focused()).toBe('Entity 2');
+    expect(tabStops()).toEqual(['Entity 2']);
+  });
+
+  it('keeps a tab stop when the page shrinks while focus is outside the grid', async () => {
+    const grid = mount({ arrowKeys: true });
+    layout();
+    await settle();
+    cells()[11]!.focus();
+    button('Page 3').focus();
+    grid.controller.goTo(2);
+    await settle();
+    expect(texts()).toHaveLength(6);
+    expect(tabStops()).toEqual(['Entity 29']);
+  });
+
+  it('never makes skeleton cells tab stops', async () => {
+    const grid = mount({
+      arrowKeys: true,
+      mode: 'server',
+      items: entities(12),
+      total: 60,
+      renderSkeleton: () => document.createElement('div'),
+    });
+    layout();
+    await settle();
+    grid.update({ loading: true });
+    await settle();
+    const skeletons = Array.from(viewport().querySelectorAll('.mf-items-grid__cell--skeleton'));
+    expect(skeletons.length).toBeGreaterThan(0);
+    expect(skeletons.some(cell => cell.hasAttribute('tabindex'))).toBe(false);
   });
 
   it('waits for server cards before focusing, and not if focus moved elsewhere meanwhile', async () => {
@@ -744,5 +845,9 @@ describe('mountItemsGrid — arrowKeys', () => {
     await settle();
     expect(cells().some(cell => cell.hasAttribute('tabindex'))).toBe(false);
     expect(press(cells()[0]!, 'ArrowRight').defaultPrevented).toBe(false);
+    // Detached for good: new cards get no tab stops either.
+    grid.controller.next();
+    await settle();
+    expect(cells().some(cell => cell.hasAttribute('tabindex'))).toBe(false);
   });
 });

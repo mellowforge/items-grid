@@ -11,6 +11,7 @@ import {
   type ItemsGridState,
   type PagerLabels,
   attachCardNavigation,
+  type CardNavigation,
   shouldPageGrid,
 } from '@mellowforge/items-grid-core';
 import {
@@ -22,6 +23,7 @@ import {
   type ReactNode,
   type Ref,
   useImperativeHandle,
+  useRef,
 } from 'react';
 
 import { ItemsGridPager } from './pager';
@@ -91,16 +93,26 @@ function ItemsGridInner<T>(
   const { controller, state, viewportRef, probeRef } = useItemsGrid(options);
   useImperativeHandle(ref, () => controller, [controller]);
 
+  // React runs card handlers (delegated to the root) after native viewport listeners, so the
+  // helper gets keys from onKeyDown below: a card control that handled a key keeps it.
+  const navigation = useRef<CardNavigation | null>(null);
   useIsomorphicLayoutEffect(() => {
     const viewport = viewportRef.current;
     if (!arrowKeys || !viewport) return undefined;
-    return attachCardNavigation(viewport, controller);
+    const attached = attachCardNavigation(viewport, controller, { listenToKeys: false });
+    navigation.current = attached;
+    return () => {
+      navigation.current = null;
+      attached.detach();
+    };
   }, [arrowKeys, controller, viewportRef]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (shouldPageGrid(event.nativeEvent) && controller.handleKeydown(event.key)) {
       event.preventDefault();
+      return;
     }
+    navigation.current?.handleKeydown(event.nativeEvent);
   };
 
   const renderPager = (): ReactNode => {

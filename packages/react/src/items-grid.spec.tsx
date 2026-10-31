@@ -464,10 +464,10 @@ describe('ItemsGrid — arrowKeys', () => {
     render(<Grid arrowKeys />);
     layout();
     await settle();
-    act(() => cells()[5]!.focus());
+    act(() => cells()[9]!.focus());
     fireEvent.keyDown(document.activeElement!, { key: 'PageDown' });
     await settle();
-    expect(focused()).toBe('Entity 17');
+    expect(focused()).toBe('Entity 21');
     // The last page has 6 cards: focus clamps to the last one.
     fireEvent.keyDown(document.activeElement!, { key: 'PageDown' });
     await settle();
@@ -498,10 +498,6 @@ describe('ItemsGrid — arrowKeys', () => {
     layout();
     await settle();
     expect(tabStops()).toEqual(['Entity 0']);
-    act(() => cells()[0]!.focus());
-    fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' });
-    // One attached helper: a leaked second one would move focus twice.
-    expect(focused()).toBe('Entity 1');
     rerender(
       <StrictMode>
         <Grid arrowKeys={false} />
@@ -509,5 +505,51 @@ describe('ItemsGrid — arrowKeys', () => {
     );
     await settle();
     expect(cells().some(cell => cell.hasAttribute('tabindex'))).toBe(false);
+    // No helper left behind by the StrictMode remount: new cards get no tab stops either.
+    fireEvent.click(screen.getByLabelText('Next page'));
+    await settle();
+    expect(cells().some(cell => cell.hasAttribute('tabindex'))).toBe(false);
+  });
+
+  it('leaves Escape to a card control that handles it, and returns to the card otherwise', async () => {
+    render(
+      <Grid
+        arrowKeys
+        renderItem={item => (
+          <article>
+            {item.name}
+            <button
+              type="button"
+              onKeyDown={event => event.key === 'Escape' && event.preventDefault()}
+            >
+              Menu {item.id}
+            </button>
+            <button type="button">Open {item.id}</button>
+          </article>
+        )}
+      />
+    );
+    layout();
+    await settle();
+    const menu = screen.getByText('Menu 3');
+    act(() => menu.focus());
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    expect(document.activeElement).toBe(menu);
+    const open = screen.getByText('Open 3');
+    act(() => open.focus());
+    fireEvent.keyDown(open, { key: 'Escape' });
+    expect(document.activeElement).toBe(cells()[3]);
+  });
+
+  it('keeps focus on a card that moves', async () => {
+    const items = entities(30);
+    const { rerender } = render(<Grid arrowKeys items={items} />);
+    layout();
+    await settle();
+    act(() => cells()[2]!.focus());
+    rerender(<Grid arrowKeys items={[items[2]!, items[0]!, items[1]!, ...items.slice(3)]} />);
+    await settle();
+    expect(focused()).toBe('Entity 2');
+    expect(tabStops()).toEqual(['Entity 2']);
   });
 });
