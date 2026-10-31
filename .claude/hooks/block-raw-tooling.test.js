@@ -89,6 +89,29 @@ describe('block-raw-tooling: publishing', () => {
     "sh -c 'pnpm publish'",
     "zsh -lc 'cd packages/core && npm publish'",
     'eval "npm publish"',
+    'npm \\\n  publish',
+    'pnpm \\\n  --filter x \\\n  publish',
+    'echo "it\'s" && npm publish && echo "that\'s"',
+    'cd packages/core && bash -c "npm publish"',
+    "bash <<'EOF'\nnpm publish\nEOF",
+    "bash -s <<'EOF'\nnpm publish\nEOF",
+    "cat <<'EOF' | bash\nnpm publish\nEOF",
+    'npm publish>/dev/null',
+    'npm publish 2>&1 | tee log',
+    'echo "$(npm publish)"',
+    'pnpm -w release',
+    'pnpm -w publish',
+    'pnpm --workspace-root release',
+    'npm --loglevel silent publish',
+    'bun publish',
+    'bun run release',
+    'pnpx changeset publish',
+    'yarnpkg publish',
+    '\\npm publish',
+    'sudo -u bob npm publish',
+    'timeout -s KILL 60 npm publish',
+    'watch -n 5 npm publish',
+    'find packages -maxdepth 1 -type d -exec npm publish {} \\;',
   ]) {
     it(`blocks ${command}`, () => expectBlocked(command, PUBLISH));
   }
@@ -104,6 +127,15 @@ describe('block-raw-tooling: tags', () => {
     'git push origin v1.0.0',
     'pnpm changeset tag',
     'npx changeset tag',
+    'pnpm -w changeset tag',
+    'git push origin \\\n  --tags',
+    'git push \\\n  origin v0.2.0',
+    'git push --mirror',
+    'git push origin +refs/tags/v1.0.0',
+    'git push origin :refs/tags/v1.0.0',
+    'git -c push.followTags=true push',
+    'git -c core.sshCommand=ssh push --tags',
+    'gh release create v0.2.0 --generate-notes',
   ]) {
     it(`blocks ${command}`, () => expectBlocked(command, TAGS));
   }
@@ -143,6 +175,19 @@ describe('block-raw-tooling: vitest in the Angular workspace', () => {
     'pnpm --dir packages/angular exec vitest run',
     'pnpm --filter items-grid-angular-workspace exec vitest run',
     'pnpm -F ./packages/angular exec vitest run',
+    'pnpm --filter items-grid-angular-workspace \\\n  exec vitest run lib/items-grid.spec.ts',
+    'npx vitest run packages/angular/projects/items-grid/src/lib/items-grid.spec.ts',
+    'npx vitest packages/angular/projects/items-grid/src/lib/items-grid.spec.ts --run',
+    'pnpm vitest run packages/angular',
+    'npx vitest run --root packages/angular',
+    'npx vitest run --root=packages/angular',
+    'pnpm -r exec vitest run',
+    'pnpm --recursive exec vitest run',
+    "pnpm --filter './packages/**' exec vitest run",
+    "pnpm --filter '{packages/angular}' exec vitest run",
+    "pnpm --filter '@mellowforge/items-grid-angular...' exec vitest run",
+    "cd packages/angular && bash -c 'npx vitest run'",
+    'echo "it\'s" && cd packages/angular && npx vitest run && echo "ok\'"',
   ]) {
     it(`blocks ${command} from the root`, () => expectBlocked(command, VITEST));
   }
@@ -179,10 +224,48 @@ describe('block-raw-tooling: allowed', () => {
     'echo publish',
     "cat <<'EOF'\nnpm publish\nEOF",
     'grep -rn "npm publish" .claude',
+    "grep -rnE 'npm|yarn' .claude",
+    'grep -rnE "npm|yarn" .',
+    "rg -n 'pnpm|yarn' docs",
+    "git log --grep='npm|yarn' --oneline",
+    "sed -i '' 's|npm|pnpm|g;s|yarn|pnpm|g' README.md",
+    "grep -E 'publish;|yarn' x",
+    "git commit -m 'npm;yarn'",
+    "gh pr create --title \"fix: don't over-block\" --body 'Allows grep; yarn stays blocked'",
+    'git commit -m "$(cat <<\'EOF\'\nchore: npm publish \"notes\"; yarn\nEOF\n)"',
+    'git push origin v0.3-docs',
+    'git push origin 2.0-prep',
+    'git push origin release/0.2.x',
+    'git push --force-with-lease origin feat/x',
+    'git fetch --tags',
+    'git ls-remote --tags origin',
+    'git tag -l',
+    'command -v yarn',
+    'command -v npm && npm --version',
+    'npm dist-tag ls @mellowforge/items-grid-core',
+    'npm help publish',
+    'pnpm help publish',
+    'npm publish --help',
+    'pnpm --filter @mellowforge/items-grid-core exec vitest run src/controller.spec.ts -t "publish"',
+    'pnpm --filter @mellowforge/items-grid-core build',
+    'pnpm -w add -D x',
+    'node scripts/pack-check.mjs',
+    'npm ls',
+    'npx prettier --check .',
+    'ls packages/core/release',
+    'cat .github/workflows/release.yml',
+    "awk '/release/ { print }' CLAUDE.md",
+    "cat <<'EOF'\nyarn add x; npm publish\nEOF",
     '',
   ]) {
     it(`allows ${JSON.stringify(command)}`, () => expectAllowed(command));
   }
+  it('stays fast on an unterminated heredoc', () => {
+    const started = Date.now();
+    expectAllowed('cat <<' + 'A'.repeat(2000) + '\n' + '\n'.repeat(5000));
+    expectAllowed('cat <<EOF\n' + '\n'.repeat(40000));
+    assert.ok(Date.now() - started < 2000, `took ${Date.now() - started} ms`);
+  });
   it('allows vitest in core', () =>
     expectAllowed('pnpm exec vitest run', path.join(ROOT, 'packages', 'core')));
 });

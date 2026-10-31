@@ -7,12 +7,16 @@
  *     protocol, `pnpm-lock.yaml`); npm or yarn would write a stray lockfile and break the links.
  *   - publishing: releases go through Changesets in CI (`.claude/rules/release.md`). An agent
  *     never runs `npm publish` / `pnpm publish` / `changeset publish` / the `release` script, in
- *     any spelling (flags, runners, wrappers like `sudo` or `bash -c '…'`).
- *   - pushing tags (`git push --tags`, a tag ref, `changeset tag`): tags come from the release.
- *   - `vitest` inside the Angular workspace (`packages/angular`): its specs need the TestBed
+ *     any common spelling (flags, runners, wrappers like `sudo`, `bash -c '…'`, heredocs fed to
+ *     a shell, line continuations).
+ *   - pushing tags (`git push --tags`, a tag ref, `changeset tag`, `gh release create`): tags
+ *     come from the release.
+ *   - `vitest` aimed at the Angular workspace (`packages/angular`): its specs need the TestBed
  *     environment that only `ng test` (`@angular/build:unit-test`) builds. In `packages/core`
  *     and `packages/react`, `pnpm exec vitest run <file>` is the documented single-file command.
  *
+ * The command line is lexed like a shell would (quotes, escapes, continuations, operators,
+ * redirects), so quoted text — commit messages, grep patterns — never counts as a command.
  * A hook is a guard rail, not a sandbox: the real control is npm-side (trusted publishing with
  * tokens disallowed, see release.md). It fails closed: an unreadable payload blocks.
  *
@@ -23,31 +27,43 @@ const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const ANGULAR = path.join(ROOT, 'packages', 'angular');
-const ANGULAR_PACKAGES = new Set([
-  'items-grid-angular-workspace',
-  '@mellowforge/items-grid-angular',
-]);
 
 const MESSAGES = {
   install:
-    'This is a pnpm workspace. Use `pnpm install` / `pnpm add <pkg> --filter <package>` (not npm or yarn).',
+    'This is a pnpm workspace. Use `pnpm install` / `pnpm add <pkg> --filter <package>` (not npm, yarn or bun).',
   publish:
     'Publishing is blocked for agents. Releases go through Changesets: add a changeset with `pnpm changeset`, and CI publishes when the release PR merges (see .claude/rules/release.md).',
   tags: 'Pushing tags is blocked for agents. Release tags come from the Changesets release (see .claude/rules/release.md).',
   vitest:
-    'Direct `vitest` is blocked in the Angular workspace. Use `pnpm ng test --watch=false --include <spec>` from packages/angular (see CLAUDE.md, Commands).',
+    'Direct `vitest` is blocked for the Angular workspace. Use `pnpm ng test --watch=false --include <spec>` from packages/angular (see CLAUDE.md, Commands).',
 };
 
-const PACKAGE_MANAGERS = new Set(['npm', 'pnpm', 'yarn', 'npx', 'bunx', 'node', 'changeset']);
-const PUBLISH_WORDS = new Set(['publish', 'pub', 'unpublish', 'dist-tag']);
+const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh']);
 const NPM_INSTALL = new Set([
   'install',
   'i',
   'in',
+  'ins',
+  'inst',
+  'insta',
+  'instal',
+  'isnt',
+  'isnta',
+  'isntal',
   'isntall',
-  'ci',
   'add',
+  'ci',
+  'clean-install',
+  'ic',
+  'install-clean',
+  'isntall-clean',
+  'cit',
+  'it',
+  'install-test',
+  'install-ci-test',
+  'clean-install-test',
   'uninstall',
+  'unlink',
   'un',
   'remove',
   'rm',
@@ -55,119 +71,245 @@ const NPM_INSTALL = new Set([
   'update',
   'up',
   'upgrade',
-]);
-// Words that run the rest of the segment as a command.
-const WRAPPERS = new Set([
-  'sudo',
-  'command',
-  'builtin',
-  'exec',
-  'nohup',
-  'time',
-  'nice',
-  'xargs',
-  'corepack',
-  'env',
-  'timeout',
-  'then',
-  'else',
-  'elif',
-  'do',
-  'if',
-  'while',
-  'until',
-  '!',
-]);
-// Package-manager options that take a separate value.
-const VALUE_FLAGS = new Set([
-  '-F',
-  '--filter',
-  '--filter-prod',
-  '-C',
-  '--dir',
-  '-w',
-  '--workspace',
-  '--prefix',
-  '--userconfig',
+  'udpate',
+  'dedupe',
+  'ddp',
+  'link',
+  'ln',
+  'prune',
 ]);
 
-/** Drops heredoc bodies; returns the command and the bodies of `sh -c '…'` / `eval '…'`. */
-const extractNested = command => {
-  const nested = [];
-  const withoutHeredocs = command.replace(
-    /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2[ \t]*(?=\n|$)/g,
-    ''
-  );
-  const shellString =
-    /(?:\b(?:ba|z|da|k)?sh\s+(?:-[a-zA-Z]+\s+)*-[a-zA-Z]*c[a-zA-Z]*|\beval)\s+(?:'([^']*)'|"((?:\\.|[^"\\])*)")/g;
-  for (const match of withoutHeredocs.matchAll(shellString)) {
-    nested.push(match[1] ?? match[2].replace(/\\(.)/g, '$1'));
+/** Wrappers that run the rest of the command, with their options that take a value. */
+const WRAPPERS = new Map([
+  ['sudo', ['-u', '-g', '-C', '-D', '-h', '-p', '-U']],
+  ['timeout', ['-s', '-k', '--signal', '--kill-after']],
+  ['nice', ['-n']],
+  ['watch', ['-n', '-d']],
+  ['env', ['-u', '-C', '-S']],
+  ['xargs', ['-I', '-n', '-P', '-L', '-d', '-E', '-s', '-a']],
+  ['exec', ['-a']],
+  ...['command', 'builtin', 'nohup', 'time', 'corepack'].map(name => [name, []]),
+  ...['if', 'then', 'else', 'elif', 'do', 'while', 'until', '!'].map(name => [name, []]),
+]);
+
+/** Options that take a separate value, per command. */
+const VALUE_FLAGS = new Map([
+  [
+    'npm',
+    [
+      '-w',
+      '--workspace',
+      '--prefix',
+      '--loglevel',
+      '--registry',
+      '--cache',
+      '--userconfig',
+      '--tag',
+      '--otp',
+    ],
+  ],
+  [
+    'pnpm',
+    [
+      '-F',
+      '--filter',
+      '--filter-prod',
+      '-C',
+      '--dir',
+      '--loglevel',
+      '--registry',
+      '--reporter',
+      '--test-pattern',
+    ],
+  ],
+  ['npx', ['-p', '--package', '-c', '--call']],
+  ['git', ['-c', '-C', '--git-dir', '--work-tree', '--namespace']],
+  [
+    'vitest',
+    [
+      '--root',
+      '-r',
+      '--dir',
+      '--config',
+      '-c',
+      '--project',
+      '-t',
+      '--testNamePattern',
+      '--reporter',
+      '--environment',
+      '--outputFile',
+      '--shard',
+    ],
+  ],
+]);
+
+// MARK: - Lexing
+
+const HEREDOC = /(?<!<)<<(?!<)-?\s*(['"]?)([\w.-]+)\1/g;
+const READS_SCRIPT = /(?:^|[|;&(]\s*|\s)(?:\S*\/)?(?:ba|z|da|k)?sh(?:\s|$)/;
+
+/**
+ * Drops heredoc bodies with a linear line scan, so prose in them never counts. A body that a
+ * shell reads (`bash <<EOF`, `cat <<EOF | bash`) is returned to be checked as commands.
+ */
+const extractHeredocs = command => {
+  const lines = command.split('\n');
+  const kept = [];
+  const scripts = [];
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    kept.push(line);
+    for (const [, , delimiter] of line.matchAll(HEREDOC)) {
+      const body = [];
+      while (++index < lines.length && lines[index].trim() !== delimiter) {
+        body.push(lines[index]);
+      }
+      if (READS_SCRIPT.test(line)) scripts.push(body.join('\n'));
+    }
   }
-  return { command: withoutHeredocs, nested };
+  return { text: kept.join('\n'), scripts };
 };
 
 /**
- * Quoted text is not run: a quoted string with spaces (a commit message, a grep pattern)
- * becomes empty; a single quoted word (`"packages/angular"`) keeps its value.
+ * Splits a command line into simple commands (arrays of words) the way a shell does: quotes
+ * and escapes build words, `\`+newline continues the line, `;` `&` `|` `(` `)` newlines,
+ * backticks, `$(` and standalone `{` `}` end a command, and redirects drop their target.
+ * `$(…)` and backticks inside double quotes are pushed to `nested`.
  */
-const unquote = command =>
-  command
-    .replace(/'([^']*)'/g, (_, body) => (/\s/.test(body) ? "''" : body))
-    .replace(/"((?:\\.|[^"\\])*)"/g, (_, body) => (/\s/.test(body) ? '""' : body));
+const lex = (text, nested) => {
+  const commands = [[]];
+  let word = null;
+  let dropTarget = false;
+  const current = () => commands[commands.length - 1];
+  const endCommand = () => {
+    if (current().length > 0) commands.push([]);
+  };
+  const endWord = () => {
+    if (word === null) return;
+    if (dropTarget) {
+      dropTarget = false;
+    } else if (word === '{' || word === '}') {
+      endCommand();
+    } else {
+      current().push(word);
+    }
+    word = null;
+  };
+  const append = value => {
+    word = (word ?? '') + value;
+  };
 
-// One simple command per segment: split on `;`, `&&`, `||`, `|`, `&`, newlines, subshells,
-// command substitution and braces.
-const segments = command => command.split(/\|\||&&|[;|&\n(){}`]|\$\(/);
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index];
+    if (char === '\\') {
+      if (text[index + 1] === '\n') {
+        index++;
+      } else if (index + 1 < text.length) {
+        append(text[++index]);
+      }
+    } else if (char === "'") {
+      const end = text.indexOf("'", index + 1);
+      const stop = end === -1 ? text.length : end;
+      append(text.slice(index + 1, stop));
+      index = stop;
+    } else if (char === '"') {
+      let value = '';
+      let at = index + 1;
+      while (at < text.length && text[at] !== '"') {
+        if (text[at] === '\\' && at + 1 < text.length) {
+          value += text[at + 1];
+          at += 2;
+        } else if (text[at] === '$' && text[at + 1] === '(') {
+          let depth = 1;
+          let end = at + 2;
+          for (; end < text.length && depth > 0; end++) {
+            if (text[end] === '(') depth++;
+            else if (text[end] === ')') depth--;
+          }
+          nested.push(text.slice(at + 2, end - 1));
+          at = end;
+        } else if (text[at] === '`') {
+          const close = text.indexOf('`', at + 1);
+          const stop = close === -1 ? text.length : close;
+          nested.push(text.slice(at + 1, stop));
+          at = stop + 1;
+        } else {
+          value += text[at++];
+        }
+      }
+      append(value);
+      index = at;
+    } else if (char === ' ' || char === '\t' || char === '\r') {
+      endWord();
+    } else if ('\n;&|()`'.includes(char) || (char === '$' && text[index + 1] === '(')) {
+      endWord();
+      endCommand();
+      if (char === '$') index++;
+    } else if (char === '<' || char === '>') {
+      // A redirect: drop the fd number written before it (`2>`) and its target word.
+      if (word !== null && /^\d+$/.test(word)) word = null;
+      endWord();
+      while (index + 1 < text.length && '<>&-'.includes(text[index + 1])) index++;
+      dropTarget = true;
+    } else {
+      append(char);
+    }
+  }
+  endWord();
+  return commands.filter(words => words.length > 0);
+};
+
+// MARK: - Classification
 
 const basename = word => word.split('/').pop();
 
-/** Strips env assignments and wrapper commands (`sudo`, `timeout 60`, `nice -n 5`, `env -i`). */
+/** Strips env assignments and wrappers (`sudo -u x`, `timeout 60`, `nice -n 5`, `env -i`). */
 const stripWrappers = words => {
   let index = 0;
   while (index < words.length) {
     const word = words[index];
-    if (/^\w+=/.test(word)) {
+    if (/^[A-Za-z_]\w*=/.test(word)) {
       index++;
-    } else if (WRAPPERS.has(word)) {
-      index++;
-      // Wrapper options and their values (`-n 5`, `-i`, a `timeout` duration).
-      while (
-        index < words.length &&
-        (/^-/.test(words[index]) || /^\d+[smhd]?$/.test(words[index]))
-      ) {
-        index++;
-      }
-    } else {
-      break;
+      continue;
     }
+    // `command -v yarn` only looks the tool up.
+    if (word === 'command' && /^-[vV]$/.test(words[index + 1] ?? '')) return [];
+    const valueFlags = WRAPPERS.get(word);
+    if (!valueFlags) break;
+    index++;
+    while (index < words.length && words[index].startsWith('-')) {
+      index += valueFlags.includes(words[index]) ? 2 : 1;
+    }
+    if (word === 'timeout' && /^\d/.test(words[index] ?? '')) index++;
   }
   return words.slice(index);
 };
 
-/**
- * The words after the head with their options removed, plus the directories and packages
- * that `-C` / `--dir` / `--prefix` / `--filter` point at.
- */
-const parseArgs = words => {
+/** Positional words (with their index), option values and flags of one command's arguments. */
+const parseArgs = (words, kind) => {
+  const valueFlags = VALUE_FLAGS.get(kind) ?? [];
   const positional = [];
-  const dirs = [];
-  const filters = [];
+  const values = new Map();
+  const flags = new Set();
   const record = (flag, value) => {
-    if (['-C', '--dir', '--prefix'].includes(flag)) dirs.push(value);
-    if (['-F', '--filter', '--filter-prod'].includes(flag)) filters.push(value);
+    flags.add(flag);
+    values.set(flag, [...(values.get(flag) ?? []), value]);
   };
   for (let index = 0; index < words.length; index++) {
     const word = words[index];
-    const inline = /^(--[\w-]+)=(.*)$/.exec(word);
+    const inline = /^(--?[\w-]+)=([\s\S]*)$/.exec(word);
     if (inline) {
       record(inline[1], inline[2]);
-    } else if (VALUE_FLAGS.has(word)) {
+    } else if (valueFlags.includes(word)) {
       record(word, words[++index] ?? '');
-    } else if (!word.startsWith('-')) {
-      positional.push(word);
+    } else if (word.startsWith('-') && word !== '-') {
+      flags.add(word);
+    } else {
+      positional.push({ word, index });
     }
   }
-  return { positional, dirs, filters };
+  const valuesOf = (...names) => names.flatMap(name => values.get(name) ?? []);
+  return { positional, flags, valuesOf };
 };
 
 const isInAngularWorkspace = dir => {
@@ -177,83 +319,162 @@ const isInAngularWorkspace = dir => {
 
 const isVitest = word => /^vitest(?:@\S*)?$/.test(basename(word));
 const isChangeset = word =>
-  /^(?:changeset|@changesets\/cli)(?:@\S*)?$/.test(word) ||
-  basename(word) === 'changeset' ||
-  /@changesets\/cli\/bin\.js$/.test(word);
+  /^(?:changeset|@changesets\/cli)(?:@\S*)?$/.test(word) || basename(word) === 'changeset';
+
+const SEMVER_TAG = /^(?:v?\d+\.\d+\.\d+(?:[-+][\w.]+)?|.*@\d+\.\d+\.\d+(?:[-+][\w.]+)?)$/;
 
 const classifyGit = args => {
-  const { positional } = parseArgs(args);
-  if (positional[0] !== 'push') return null;
-  if (args.some(word => word === '--tags' || word === '--follow-tags')) return 'tags';
-  // A tag ref: refs/tags/…, a version (v1.2.3) or a Changesets tag (@scope/name@1.2.3).
+  const { positional, flags, valuesOf } = parseArgs(args, 'git');
+  if (positional[0]?.word !== 'push') return null;
+  if (['--tags', '--follow-tags', '--mirror'].some(flag => flags.has(flag))) return 'tags';
+  if (valuesOf('-c').some(value => /^push\.followtags=(?:true|yes|on|1)$/i.test(value))) {
+    return 'tags';
+  }
+  // positional[1] is the remote; the rest are refspecs (`src:dst`, `+force`, `:delete`).
+  const refs = positional.slice(2).flatMap(({ word }) => word.replace(/^\+/, '').split(':'));
+  return refs.some(ref => ref.startsWith('refs/tags/') || SEMVER_TAG.test(ref)) ? 'tags' : null;
+};
+
+const classifyChangeset = args => {
+  const subcommand = parseArgs(args, 'changeset').positional[0]?.word;
+  if (subcommand === 'publish') return 'publish';
+  return subcommand === 'tag' ? 'tags' : null;
+};
+
+/** Whether a vitest run, in this context, would pick up the Angular specs. */
+const vitestTargetsAngular = (args, context) => {
+  const { positional, valuesOf } = parseArgs(args, 'vitest');
+  const inAngular = target => isInAngularWorkspace(path.resolve(context.dir, target));
+  let scoped;
+  if (context.filters.length > 0) {
+    scoped = context.filters.some(
+      filter =>
+        filter.includes('angular') ||
+        /[*{]|^\.\.\.|\.\.\.$/.test(filter) ||
+        (filter.startsWith('.') && inAngular(filter))
+    );
+  } else if (context.dirs.length > 0) {
+    scoped = context.dirs.some(isInAngularWorkspace);
+  } else {
+    scoped = context.recursive || isInAngularWorkspace(context.dir);
+  }
+  return (
+    scoped ||
+    valuesOf('--root', '-r', '--dir').some(inAngular) ||
+    positional.some(({ word }) => word.includes('/') && inAngular(word))
+  );
+};
+
+const classifyPackageManager = (manager, args, context) => {
+  const { positional, flags } = parseArgs(args, manager === 'pnpm' ? 'pnpm' : 'npm');
+  if (flags.has('--help') || flags.has('-h') || positional[0]?.word === 'help') return null;
+  const [first, second] = positional;
+  const subcommand = first?.word;
+  if (['publish', 'pub', 'unpublish'].includes(subcommand)) return 'publish';
+  if (subcommand === 'dist-tag') {
+    return ['add', 'rm', 'set'].includes(second?.word) ? 'publish' : null;
+  }
+  if (subcommand === 'release') return 'publish';
+  if (['run', 'run-script'].includes(subcommand) && second?.word === 'release') return 'publish';
+  if (['yarn', 'yarnpkg'].includes(manager) && !['run', 'exec', 'dlx'].includes(subcommand)) {
+    return 'install';
+  }
+  if (manager === 'bun' && NPM_INSTALL.has(subcommand)) return 'install';
   if (
-    positional
-      .slice(1)
-      .some(
-        word => /^refs\/tags\//.test(word) || /^v?\d+\.\d+/.test(word) || /@\d+\.\d+/.test(word)
-      )
+    manager === 'npm' &&
+    (NPM_INSTALL.has(subcommand) || (subcommand === 'audit' && second?.word === 'fix'))
   ) {
-    return 'tags';
+    return 'install';
   }
-  return null;
+  if (!first) return null;
+
+  // Options before the subcommand scope what it runs (`pnpm -C dir`, `--filter`, `-r`).
+  const scope = parseArgs(args.slice(0, first.index), 'pnpm');
+  const inner = {
+    ...context,
+    dirs: [
+      ...context.dirs,
+      ...scope.valuesOf('-C', '--dir', '--prefix').map(dir => path.resolve(context.dir, dir)),
+    ],
+    filters: [...context.filters, ...scope.valuesOf('-F', '--filter', '--filter-prod')],
+    recursive:
+      context.recursive ||
+      (manager === 'pnpm' && (scope.flags.has('-r') || scope.flags.has('--recursive'))),
+  };
+  // A script or binary run through the manager (`pnpm exec changeset publish`,
+  // `npm run changeset -- publish`): judge what it runs.
+  if (['run', 'run-script', 'exec', 'dlx', 'x'].includes(subcommand)) {
+    return second ? classify(args.slice(second.index), inner) : null;
+  }
+  // `pnpm <name>` runs a script or a binary (`pnpm changeset publish`, `pnpm vitest run`).
+  return manager === 'pnpm' || manager === 'bun' ? classify(args.slice(first.index), inner) : null;
 };
 
-/** Classifies one simple command, given the directory it runs in. */
-const classify = (words, dir) => {
-  const command = stripWrappers(words);
-  if (command.length === 0) return null;
-  const head = basename(command[0]);
-  const args = command.slice(1);
+/** Classifies one simple command. */
+const classify = (input, context) => {
+  const words = stripWrappers(input);
+  if (words.length === 0) return null;
+  const head = basename(words[0]);
+  const args = words.slice(1);
 
+  if (SHELLS.has(head)) {
+    const at = args.findIndex(word => /^-[a-zA-Z]*c[a-zA-Z]*$/.test(word));
+    return at !== -1 && args[at + 1] !== undefined
+      ? check(args[at + 1], context.dir, context.depth + 1)
+      : null;
+  }
+  if (head === 'eval') return check(args.join(' '), context.dir, context.depth + 1);
+  if (head === 'find') {
+    const at = args.findIndex(word => ['-exec', '-execdir', '-ok', '-okdir'].includes(word));
+    if (at === -1) return null;
+    const rest = args.slice(at + 1);
+    const end = rest.findIndex(word => word === ';' || word === '+');
+    return classify(end === -1 ? rest : rest.slice(0, end), context);
+  }
   if (head === 'git') return classifyGit(args);
-  if (isVitest(command[0])) return isInAngularWorkspace(dir) ? 'vitest' : null;
-  if (!PACKAGE_MANAGERS.has(head) && !isChangeset(command[0])) return null;
-
-  const { positional, dirs, filters } = parseArgs(args);
-  if (positional.some(word => PUBLISH_WORDS.has(word))) return 'publish';
-  const changesetAt = isChangeset(command[0]) ? -1 : positional.findIndex(isChangeset);
-  if ((changesetAt !== -1 || isChangeset(command[0])) && positional[changesetAt + 1] === 'tag') {
-    return 'tags';
+  if (head === 'gh') return args[0] === 'release' && args[1] === 'create' ? 'tags' : null;
+  if (isVitest(words[0])) return vitestTargetsAngular(args, context) ? 'vitest' : null;
+  if (isChangeset(words[0])) return classifyChangeset(args);
+  if (head === 'node') {
+    const script = parseArgs(args, 'node').positional[0];
+    return script && /@changesets\/cli\/bin\.js$/.test(script.word)
+      ? classifyChangeset(args.slice(script.index + 1))
+      : null;
   }
-  const script = ['run', 'run-script'].includes(positional[0]) ? positional[1] : positional[0];
-  if (['npm', 'pnpm', 'yarn'].includes(head) && script === 'release') return 'publish';
-  if (head === 'yarn') return 'install';
-  if (head === 'npm' && NPM_INSTALL.has(positional[0])) return 'install';
-
-  if (positional.some(isVitest)) {
-    const targetsAngular =
-      dirs.some(target => isInAngularWorkspace(path.resolve(dir, target))) ||
-      filters.some(
-        filter =>
-          ANGULAR_PACKAGES.has(filter) ||
-          (/^\.{0,2}\//.test(filter) && isInAngularWorkspace(path.resolve(dir, filter)))
-      );
-    if (
-      targetsAngular ||
-      (dirs.length === 0 && filters.length === 0 && isInAngularWorkspace(dir))
-    ) {
-      return 'vitest';
+  if (['npx', 'bunx', 'pnpx'].includes(head)) {
+    const { positional, valuesOf } = parseArgs(args, 'npx');
+    for (const command of valuesOf('-c', '--call')) {
+      const reason = check(command, context.dir, context.depth + 1);
+      if (reason) return reason;
     }
+    return positional[0] ? classify(args.slice(positional[0].index), context) : null;
+  }
+  if (['npm', 'pnpm', 'yarn', 'yarnpkg', 'bun'].includes(head)) {
+    return classifyPackageManager(head, args, context);
   }
   return null;
 };
 
-/** Returns the reason to block `command`, or null. */
-const check = (command, startDir) => {
-  const { command: outer, nested } = extractNested(command);
-  for (const inner of nested) {
-    const reason = check(inner, startDir);
+/** Returns the reason to block `command` when run from `startDir`, or null. */
+const check = (command, startDir, depth = 0) => {
+  if (depth > 8) return null;
+  const { text, scripts } = extractHeredocs(command);
+  const nested = [];
+  const commands = lex(text, nested);
+  for (const inner of [...scripts, ...nested]) {
+    const reason = check(inner, startDir, depth + 1);
     if (reason) return reason;
   }
-  // Follow `cd` / `pushd` within the command so `cd packages/angular && pnpm vitest` is caught.
+  // Follow `cd` / `pushd` so `cd packages/angular && pnpm vitest` is judged in that directory.
   let dir = startDir;
-  for (const segment of segments(unquote(outer))) {
-    const words = segment.trim().split(/\s+/).filter(Boolean);
-    if ((words[0] === 'cd' || words[0] === 'pushd') && words[1] && words[1] !== '-') {
-      dir = path.resolve(dir, words[1].replace(/^~(?=\/|$)/, process.env.HOME ?? '~'));
+  for (const words of commands) {
+    if (words[0] === 'cd' || words[0] === 'pushd') {
+      if (words[1] && words[1] !== '-') {
+        dir = path.resolve(dir, words[1].replace(/^~(?=\/|$)/, process.env.HOME ?? '~'));
+      }
       continue;
     }
-    const reason = classify(words, dir);
+    const reason = classify(words, { dir, dirs: [], filters: [], recursive: false, depth });
     if (reason) return reason;
   }
   return null;
