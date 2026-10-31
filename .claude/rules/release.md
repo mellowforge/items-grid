@@ -10,7 +10,7 @@ Three packages are published to npm by **Changesets** from `.github/workflows/re
   - Features are minor; fixes are patch.
   - From 1.0 on, breaking changes are major.
 - **The three packages are versioned in lockstep** (`fixed` in `.changeset/config.json`), so users only ever need "the same version of every `@mellowforge/items-grid-*` package". A changeset still names only the packages that changed. Their CHANGELOGs get the entry; the others only get the new version.
-- **Keep the adapters' peer range on core at `workspace:0.x`** (published as `0.x`), together with `onlyUpdatePeerDependentsWhenOutOfRange`. Don't change it back to `workspace:^`. Before 1.0, `^0.1.0` excludes `0.2.0`, and Changesets answers an outdated peer range with a **major** bump of the dependents, so every core minor would push all packages (through `fixed`) to 1.0.0.
+- **Keep the adapters' peer range on core at `workspace:0.x`** (published as `0.x`), together with `onlyUpdatePeerDependentsWhenOutOfRange`. Don't change it back to `workspace:^`. Before 1.0, `^0.1.0` excludes `0.2.0`: Changesets CLI v2 answered an outdated peer range with a **major** bump of the dependents (pushing every package, through `fixed`, to 1.0.0). CLI v3, which the repo uses, bumps them by patch instead, so the range is no longer load-bearing — but `0.x` stays correct for the lockstep packages and keeps the dependents from being bumped at all.
   - After touching the config, run `pnpm changeset status --verbose` and check the planned versions.
   - At 1.0 the range becomes `workspace:^`.
 - **Private workspace packages** (the apps, `demo-shared`, the Angular workspace) are never versioned (`privatePackages: { version: false, tag: false }`).
@@ -25,7 +25,7 @@ Three packages are published to npm by **Changesets** from `.github/workflows/re
   - `@mellowforge/items-grid-angular`: `fesm2022/` and `types/` (with `.d.ts`); there is no `dist/` inside this tarball.
 - **Each package directory carries a `LICENSE`** that is a byte-identical copy of the root `LICENSE`, because npm only packs files from inside the package. For Angular, ng-packagr copies `packages/angular/projects/items-grid/LICENSE` into `dist/items-grid`. `pnpm pack:check` compares each tarball's LICENSE with the root one.
 - **The Angular package is published from `packages/angular/dist/items-grid`** (`publishConfig.directory`). pnpm rewrites the `workspace:` ranges there at pack time. `pnpm pack:check` proves it and also runs arethetypeswrong on every tarball.
-- **The Version Packages PR shows no CI checks.** It is opened with `GITHUB_TOKEN`, and GitHub does not trigger other workflows from that token's pushes. To compensate, `pnpm release` re-runs every gate before publishing. To get real checks on the PR, pass a fine-grained PAT to `changesets/action`'s `github-token` input (v2 ignores a `GITHUB_TOKEN` env var).
+- **The Version Packages PR shows no CI checks.** It is opened with `GITHUB_TOKEN`, and GitHub does not trigger other workflows from that token's pushes. To compensate, `pnpm release` re-runs every gate before publishing. To get real checks on the PR, pass a fine-grained PAT to `changesets/action`'s `github-token` input (the action's v2 ignores a `GITHUB_TOKEN` env var).
 - **The release job runs only in `mellowforge/items-grid`**, so forks never open Version PRs or try to publish.
 
 ## First publish and trusted publishing (maintainer)
@@ -53,4 +53,4 @@ If the Release run publishes some packages and fails on another (e.g. a missing 
 
 1. Fix the cause (e.g. add the missing trusted publisher).
 2. Re-run the failed Release workflow run. `changeset publish` skips versions already on npm and publishes the rest.
-3. Check that every package's tag reached GitHub: `git ls-remote --tags origin`. If any are missing, the maintainer runs `pnpm changeset tag && git push --follow-tags` on the release commit.
+3. Check that every package's tag reached GitHub: `git ls-remote --tags origin`. If any are missing, the maintainer runs `pnpm changeset git-tag && git push --follow-tags` on the release commit (`git-tag` is CLI v3's name for v2's `tag`).

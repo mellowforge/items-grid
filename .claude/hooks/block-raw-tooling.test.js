@@ -128,6 +128,8 @@ describe('block-raw-tooling: tags', () => {
     'pnpm changeset tag',
     'npx changeset tag',
     'pnpm -w changeset tag',
+    'pnpm changeset git-tag',
+    'npx @changesets/cli git-tag',
     'git push origin \\\n  --tags',
     'git push \\\n  origin v0.2.0',
     'git push --mirror',

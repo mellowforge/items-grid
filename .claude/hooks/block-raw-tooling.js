@@ -9,7 +9,7 @@
  *     never runs `npm publish` / `pnpm publish` / `changeset publish` / the `release` script, in
  *     any common spelling (flags, runners, wrappers like `sudo`, `bash -c '…'`, heredocs fed to
  *     a shell, line continuations).
- *   - pushing tags (`git push --tags`, a tag ref, `changeset tag`, `gh release create`): tags
+ *   - pushing tags (`git push --tags`, a tag ref, `changeset tag` / `git-tag`, `gh release create`): tags
  *     come from the release.
  *   - `vitest` aimed at the Angular workspace (`packages/angular`): its specs need the TestBed
  *     environment that only `ng test` (`@angular/build:unit-test`) builds. In `packages/core`
@@ -338,7 +338,8 @@ const classifyGit = args => {
 const classifyChangeset = args => {
   const subcommand = parseArgs(args, 'changeset').positional[0]?.word;
   if (subcommand === 'publish') return 'publish';
-  return subcommand === 'tag' ? 'tags' : null;
+  // `changeset tag` (CLI v2) is `changeset git-tag` in v3: both create the release tags.
+  return subcommand === 'tag' || subcommand === 'git-tag' ? 'tags' : null;
 };
 
 /** Whether a vitest run, in this context, would pick up the Angular specs. */

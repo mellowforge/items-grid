@@ -10,8 +10,9 @@ name: Release
 # Auth: npm trusted publishing (OIDC) — no npm token is stored anywhere. Each package's trusted
 # publisher on npmjs.com (package → Settings → Trusted Publisher) must name GitHub owner
 # "mellowforge", repository "items-grid", workflow file "release.yml" and no environment, with
-# direct publishing allowed. changesets/action skips writing an .npmrc when OIDC is available, and
-# pnpm performs the OIDC exchange itself. Trusted publishers can only be added to packages that
+# direct publishing allowed. changesets/action v2 never writes an .npmrc (it relies on trusted
+# publishing), and pnpm performs the OIDC exchange itself. changesets/action v2 requires
+# Changesets CLI v3 (the root devDependency). Trusted publishers can only be added to packages that
 # already exist, so the very first version of each package is published by hand — see
 # .claude/rules/release.md.
 
