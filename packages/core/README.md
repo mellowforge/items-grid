@@ -200,7 +200,7 @@ handler. `getCardMove` (with `CardGrid` / `CardMove`) is the pure key-to-target 
 ## Styling
 
 Layout is applied inline; no stylesheet is required. `@mellowforge/items-grid-core/styles.css`
-is an optional, minimal pager theme (plus the focus ring of cards with `arrowKeys`). Theme it with `--mf-items-grid-*` custom properties set
+is an optional, minimal pager theme (plus the focus ring of cards with `arrowKeys`); on a narrow grid its buttons wrap below the status. Theme it with `--mf-items-grid-*` custom properties set
 anywhere up the tree (e.g. `:root`); every value has a fallback, so the pager also works when
 placed outside the grid. Class hooks: `mf-items-grid`, `mf-items-grid__viewport`, `__cell`,
 `__cell--skeleton`, `__empty`, `__probe`, `__live`, `mf-items-grid-pager`, `__status`,

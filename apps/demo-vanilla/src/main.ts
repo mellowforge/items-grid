@@ -24,7 +24,11 @@ import {
   MODE_OPTIONS,
   REFLOW_OPTIONS,
   startSimulation,
+  restoreTheme,
 } from 'demo-shared';
+
+// The light/dark choice made on the landing page (or another demo) carries over.
+restoreTheme();
 
 // MARK: - App state
 

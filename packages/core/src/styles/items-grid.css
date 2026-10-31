@@ -33,6 +33,10 @@
 .mf-items-grid-pager {
   display: flex;
   flex: none;
+  /* Narrow grids (phones, side panels): the buttons wrap below the status instead of
+     overflowing. The pager is outside the measured viewport, so a taller pager only
+     leaves fewer rows. */
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--mf-items-grid-pager-gap, 6px);
@@ -44,10 +48,12 @@
 .mf-items-grid-pager__status {
   color: var(--mf-items-grid-pager-muted, color-mix(in srgb, currentColor 60%, transparent));
   font-size: 0.8125rem;
+  white-space: nowrap;
 }
 
 .mf-items-grid-pager__list {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--mf-items-grid-pager-gap, 6px);
 }

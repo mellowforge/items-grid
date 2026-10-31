@@ -9,17 +9,18 @@ Design history: Figma prototypes (presets × viewports, states, slack alignment)
 ## Layout
 
 ```text
-packages/core                     engine/ (pure: layout, paging, presets, freeze) · controller.ts · pager.ts · dom/ (observe, keyboard, styles, vanilla) · styles/
+packages/core                     engine/ (pure: layout, paging, presets, freeze, navigation) · controller.ts · pager.ts · dom/ (observe, keyboard, card-navigation, styles, vanilla) · styles/
 packages/react                    useItemsGrid · <ItemsGrid> · <ItemsGridPager>
 packages/angular                  Angular CLI workspace; library at projects/items-grid
-apps/demo-shared                  fixtures, simulation, fake API, shared demo.css (source-only)
+apps/site                         landing page (React, source-linked); deployed with the demos to GitHub Pages
+apps/demo-shared                  fixtures, simulation, fake API, theme toggle helpers, shared demo.css (source-only)
 apps/demo-vanilla                 consumes core from dist — the published-layout proof
 apps/demo-react, apps/demo-angular  source-linked mirrors of each other
 ```
 
 ## Commands
 
-- `pnpm build` (core → react → angular → apps), `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm pack:check`, `pnpm test:hooks`.
+- `pnpm build` (core → react → angular → apps), `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm pack:check`, `pnpm test:hooks`, `pnpm build:pages` (landing page + demos into `_site/` under `/items-grid/`; `.github/workflows/pages.yml` deploys it on every push to `main`).
 - Scoped: `pnpm --filter @mellowforge/items-grid-core exec vitest run src/controller.spec.ts -t '<name>'`; Angular: `cd packages/angular && pnpm ng test --watch=false` (one spec: `--include lib/items-grid.spec.ts`, relative to the library source root).
 - Adapters, `demo-vanilla` and the Angular library resolve core from `packages/core/dist` — **build core first** after changing it.
 
